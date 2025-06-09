@@ -18,5 +18,5 @@ jobs:
 
       - uses: ./.github/actions/setup-gcp
         with:
-          key: ${{ secrets.DOCKER_PASSWORD }}
+          key: ${{ secrets.AWS_ACCESS_KEY_ID }}
         
