@@ -1,0 +1,22 @@
+name: Deploy extract-into-sheets
+
+on:
+  push:
+    branches:
+      - test
+    paths:
+      - 'functions/extract-into-sheets*/**'
+      - '.github/workflows/deploy-extract-into-sheets.yml'
+      - '.github/actions/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+
+      - uses: actions/checkout@v2
+
+      - uses: ./.github/actions/setup-gcp
+        with:
+          key: ${{ secrets.KEY }}
+        
