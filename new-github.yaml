@@ -1,0 +1,24 @@
+name: Deploy extract-into-sheets
+
+on:
+  push:
+    branches:
+      - test
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Simulate hardcoded secrets (⚠️ bad practice)
+        run: |
+          echo "Hardcoded AWS key: AKIAIOSFOE"
+          echo "Hardcoded AWS secret: wJalrXUtnFEMXAMPLEKEY"
+          echo "Hardcoded GitHub token: REDACTED_SECRET"
+          echo "Hardcoded DB password: REDACTED_SECRET!"
+
+      - name: Deploy (placeholder)
+        run: echo "Deploying app..."
