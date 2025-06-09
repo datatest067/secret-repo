@@ -12,11 +12,17 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    steps:
 
+    steps:
       - uses: actions/checkout@v2
 
-      - uses: ./.github/actions/setup-gcp
+      - name: Set up GCP with secret key
+        uses: ./.github/actions/setup-gcp
         with:
-          key: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        
+          key: ${{ secrets.DB_PASSWORD }}
+
+      - name: Deploy function (example step)
+        run: echo "Deploying function with env"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
