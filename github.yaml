@@ -12,11 +12,17 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    steps:
 
+    steps:
       - uses: actions/checkout@v2
 
-      - uses: ./.github/actions/setup-gcp
+      - name: Set up GCP with ***REMOVED*** key
+        uses: ./.github/actions/setup-gcp
         with:
           key: ${{ ***REMOVED***s.***REMOVED*** }}
-        
+
+      - name: Deploy function (example step)
+        run: echo "Deploying function with env"
+        env:
+          ***REMOVED***: ${{ ***REMOVED***s.***REMOVED*** }}
+          DOCKER_PASSWORD: ${{ ***REMOVED***s.DOCKER_PASSWORD }}
