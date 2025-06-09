@@ -18,5 +18,5 @@ jobs:
 
       - uses: ./.github/actions/setup-gcp
         with:
-          key: ${{ ***REMOVED***s.KEY }}
+          key: ${{ ***REMOVED***s.***REMOVED*** }}
         
