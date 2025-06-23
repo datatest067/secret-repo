@@ -28,20 +28,35 @@ jobs:
       - name: Install git-filter-repo
         run: |
           pip install git-filter-repo
+          sudo apt-get install ripgrep
 
+      - name: Find potential ***REMOVED***s in history
+        run: |
+          mkdir -p .***REMOVED***-scan
+          for commit in $(git rev-list --all); do
+            git checkout $commit --quiet
+            rg --no-filename --no-line-number -i -e '(***REMOVED***|***REMOVED***|api[_-]?key|***REMOVED***)[\s:=]+[\'"]?[A-Za-z0-9_\-]{6,}[\'"]?' . >> .***REMOVED***-scan/matches.txt || true
+          done
+
+          sort -u .***REMOVED***-scan/matches.txt > .***REMOVED***-scan/unique.txt
+
+          echo "Generating replacements.txt..."
+          > replacements.txt
+          while read -r ***REMOVED***; do
+            trimmed=$(echo "$***REMOVED***" | sed -E "s/.*['\"]?([A-Za-z0-9_\-]{6,})['\"]?.*/\1/")
+            echo "$trimmed==>REDACTED_SECRET" >> replacements.txt
+          done < .***REMOVED***-scan/unique.txt
+
+          echo "Secrets to be removed:"
+          cat replacements.txt
+          
       - name: Clean working directory
         run: |
           git clean -xfd
-
-      - name: Remove ***REMOVED***s from history
+  
+      - name: Clean repository
         run: |
-          # Example: Remove a file named '***REMOVED***s.txt' from all history
-          # To remove a string, create a file 'replacements.txt' with lines like:
-          # SECRET_STRING==>REMOVED
-          # and use: --replace-text replacements.txt
-          git filter-repo --force --path ***REMOVED***s.txt --invert-paths
-          # Uncomment and customize the next line for string replacement:
-          # git filter-repo --force --replace-text replacements.txt
+          git filter-repo --force --replace-text replacements.txt
 
       - name: Set remote URL
         run: |
@@ -54,13 +69,12 @@ jobs:
           git push --force --all
           git push --force --tags
 
-      - name: Validate cleaned repository
+      - name: Validate cleanup
         run: |
-          # Example: Check that the ***REMOVED*** file is gone
-          if git rev-list --all | xargs git grep 'SECRET_STRING'; then
-            echo "Secret still present!" && exit 1
+          if git rev-list --all | xargs git grep -i -E '(***REMOVED***|***REMOVED***|api[_-]?key|***REMOVED***)[\s:=]+[\'"]?[A-Za-z0-9_\-]{6,}[\'"]?'; then
+            echo "Secrets still found!" && exit 1
           else
-            echo "Secret successfully purged."
+            echo "Secrets successfully purged."
           fi
 
       - name: Comment on PR
