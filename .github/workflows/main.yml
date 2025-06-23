@@ -33,22 +33,24 @@ jobs:
       - name: Find potential secrets in history
         run: |
           mkdir -p .secret-scan
+          
           for commit in $(git rev-list --all); do
-            git checkout $commit --quiet
-            rg --no-filename --no-line-number -i -e '(password|secret|api[_-]?key|token)[\s:=]+[\'"]?[A-Za-z0-9_\-]{6,}[\'"]?' . >> .secret-scan/matches.txt || true
+            git checkout "$commit" --quiet || continue
+            rg --no-filename --no-line-number -i -e "\(password\|secret\|api[_-]\?key\|token\)[[:space:]:=]\+['\"]\?[A-Za-z0-9_-]\{6,\}['\"]\?" . >> .secret-scan/matches.txt || true
           done
-
+          
           sort -u .secret-scan/matches.txt > .secret-scan/unique.txt
-
+          
           echo "Generating replacements.txt..."
           > replacements.txt
-          while read -r secret; do
-            trimmed=$(echo "$secret" | sed -E "s/.*['\"]?([A-Za-z0-9_\-]{6,})['\"]?.*/\1/")
+          while IFS= read -r secret; do
+            trimmed=$(echo "$secret" | sed -E "s/.*['\"]?([A-Za-z0-9_-]{6,})['\"]?.*/\1/")
             echo "$trimmed==>REDACTED_SECRET" >> replacements.txt
           done < .secret-scan/unique.txt
-
+          
           echo "Secrets to be removed:"
           cat replacements.txt
+
           
       - name: Clean working directory
         run: |
