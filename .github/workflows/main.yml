@@ -45,7 +45,7 @@ jobs:
 
       - name: Set remote URL
         run: |
-          git remote set-url origin "https://x-access-token:${MY_SECRET}@github.com/${GITHUB_REPOSITORY}.git"
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
         env:
           GITHUB_TOKEN: ${{ secrets.MY_SECRET }}
 
