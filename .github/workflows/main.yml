@@ -28,20 +28,35 @@ jobs:
       - name: Install git-filter-repo
         run: |
           pip install git-filter-repo
+          sudo apt-get install ripgrep
 
+      - name: Find potential secrets in history
+        run: |
+          mkdir -p .secret-scan
+          for commit in $(git rev-list --all); do
+            git checkout $commit --quiet
+            rg --no-filename --no-line-number -i -e '(***REMOVED***|secret|api[_-]?key|token)[\s:=]+[\'"]?[A-Za-z0-9_\-]{6,}[\'"]?' . >> .secret-scan/matches.txt || true
+          done
+
+          sort -u .secret-scan/matches.txt > .secret-scan/unique.txt
+
+          echo "Generating replacements.txt..."
+          > replacements.txt
+          while read -r secret; do
+            trimmed=$(echo "$secret" | sed -E "s/.*['\"]?([A-Za-z0-9_\-]{6,})['\"]?.*/\1/")
+            echo "$trimmed==>REDACTED_SECRET" >> replacements.txt
+          done < .secret-scan/unique.txt
+
+          echo "Secrets to be removed:"
+          cat replacements.txt
+          
       - name: Clean working directory
         run: |
           git clean -xfd
-
-      - name: Remove secrets from history
+  
+      - name: Clean repository
         run: |
-          # Example: Remove a file named 'secrets.txt' from all history
-          # To remove a string, create a file 'replacements.txt' with lines like:
-          # SECRET_STRING==>REMOVED
-          # and use: --replace-text replacements.txt
-          git filter-repo --force --path secrets.txt --invert-paths
-          # Uncomment and customize the next line for string replacement:
-          # git filter-repo --force --replace-text replacements.txt
+          git filter-repo --force --replace-text replacements.txt
 
       - name: Set remote URL
         run: |
@@ -54,13 +69,12 @@ jobs:
           git push --force --all
           git push --force --tags
 
-      - name: Validate cleaned repository
+      - name: Validate cleanup
         run: |
-          # Example: Check that the secret file is gone
-          if git rev-list --all | xargs git grep 'SECRET_STRING'; then
-            echo "Secret still present!" && exit 1
+          if git rev-list --all | xargs git grep -i -E '(***REMOVED***|secret|api[_-]?key|token)[\s:=]+[\'"]?[A-Za-z0-9_\-]{6,}[\'"]?'; then
+            echo "Secrets still found!" && exit 1
           else
-            echo "Secret successfully purged."
+            echo "Secrets successfully purged."
           fi
 
       - name: Comment on PR
