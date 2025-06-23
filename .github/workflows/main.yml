@@ -39,26 +39,38 @@ jobs:
             rg --no-filename --no-line-number -i -e "\(***REMOVED***\|secret\|api[_-]\?key\|token\)[[:space:]:=]\+['\"]\?[A-Za-z0-9_-]\{6,\}['\"]\?" . >> .secret-scan/matches.txt || true
           done
           
-          sort -u .secret-scan/matches.txt > .secret-scan/unique.txt
+          sort -u .secret-scan/matches.txt > .secret-scan/unique.txt || true
           
           echo "Generating replacements.txt..."
-          > replacements.txt
-          while IFS= read -r secret; do
-            trimmed=$(echo "$secret" | sed -E "s/.*['\"]?([A-Za-z0-9_-]{6,})['\"]?.*/\1/")
-            echo "$trimmed==>REDACTED_SECRET" >> replacements.txt
-          done < .secret-scan/unique.txt
           
-          echo "Secrets to be removed:"
-          cat replacements.txt
+          if [[ -s .secret-scan/unique.txt ]]; then
+            > replacements.txt
+            while IFS= read -r secret; do
+              trimmed=$(echo "$secret" | sed -E "s/.*['\"]?([A-Za-z0-9_-]{6,})['\"]?.*/\1/")
+              echo "$trimmed==>REDACTED_SECRET" >> replacements.txt
+            done < .secret-scan/unique.txt
+          
+            echo "Secrets to be removed:"
+            cat replacements.txt
+          else
+            echo "✅ No secrets detected — skipping replacement."
+            touch replacements.txt  # Create empty file to avoid filter-repo failure
+          fi
+
 
           
-      - name: Clean working directory
-        run: |
-          git clean -xfd
+      # - name: Clean working directory
+      #   run: |
+      #     git clean -xfd
   
       - name: Clean repository
         run: |
           git filter-repo --force --replace-text replacements.txt
+
+      # - name: Run git-filter-repo
+      #   if: success() && hashFiles('replacements.txt') != ''
+      #   run: |
+      #     git filter-repo --force --replace-text replacements.txt
 
       - name: Set remote URL
         run: |
