@@ -10,7 +10,6 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-      workflows: write
 
     steps:
       - name: Checkout repository (all history, all refs)
@@ -164,25 +163,11 @@ jobs:
 
       - name: Force-push all refs
         run: |
-          echo "Force-pushing all branches and tags..."
-          echo "Current branches:"
-          git branch -a
-          echo "Current tags:"
-          git tag -l
-          echo "Remote configuration:"
-          git remote -v
-          
-          # Force push all branches
-          echo "Pushing all branches..."
+          git config --global user.name "datatest067"
+          git config --global user.email "datatest067@gmail.com"
+          git remote set-url origin https://x-access-token:${{ secrets.MY_SECRET }}@github.com/${GITHUB_REPOSITORY}.git
           git push --force --all
-          
-          # Force push all tags
-          echo "Pushing all tags..."
           git push --force --tags
-          
-          echo "Force-push completed successfully!"
-        env:
-          GITHUB_TOKEN: ${{ secrets.MY_SECRET }}
 
       - name: Validate cleaned repository
         run: |
