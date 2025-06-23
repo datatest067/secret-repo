@@ -29,8 +29,15 @@ jobs:
           # Create a bundle with all refs (branches, tags, etc.)
           git bundle create "${BACKUP_NAME}.bundle" --all
           
-          # Also create a tar.gz backup for redundancy
-          tar -czf "${BACKUP_NAME}.tar.gz" --exclude='.git' .
+          # Create a tar.gz backup for redundancy (with error handling)
+          echo "Creating tar backup..."
+          if tar -czf "${BACKUP_NAME}.tar.gz" --exclude='.git' --exclude='*.bundle' . 2>/dev/null; then
+            echo "Tar backup created successfully"
+          else
+            echo "Warning: Tar backup failed (files may have changed during backup)"
+            # Create a minimal backup with just the bundle
+            echo "Proceeding with git bundle backup only"
+          fi
           
           # List all branches and tags for verification
           echo "Repository branches:"
@@ -38,12 +45,19 @@ jobs:
           echo "Repository tags:"
           git tag -l
           
-          # Create GitHub release with backup files
-          gh release create "backup-${BACKUP_TIMESTAMP}" \
-            "${BACKUP_NAME}.bundle" \
-            "${BACKUP_NAME}.tar.gz" \
-            --title "Pre-purge backup - ${BACKUP_TIMESTAMP}" \
-            --notes "Complete repository backup before secret purging. Contains all branches and tags."
+          # Create GitHub release with available backup files
+          if [ -f "${BACKUP_NAME}.tar.gz" ]; then
+            gh release create "backup-${BACKUP_TIMESTAMP}" \
+              "${BACKUP_NAME}.bundle" \
+              "${BACKUP_NAME}.tar.gz" \
+              --title "Pre-purge backup - ${BACKUP_TIMESTAMP}" \
+              --notes "Complete repository backup before secret purging. Contains all branches and tags."
+          else
+            gh release create "backup-${BACKUP_TIMESTAMP}" \
+              "${BACKUP_NAME}.bundle" \
+              --title "Pre-purge backup - ${BACKUP_TIMESTAMP}" \
+              --notes "Repository backup before secret purging. Contains all branches and tags (git bundle only)."
+          fi
           
           echo "Backup completed successfully: backup-${BACKUP_TIMESTAMP}"
         env:
