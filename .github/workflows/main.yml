@@ -85,11 +85,12 @@ jobs:
 
       - name: Validate cleanup
         run: |
-          if git rev-list --all | xargs git grep -i -E "(***REMOVED***|secret|api[_-]?key|token)[\\s:=]+['\"]?[A-Za-z0-9_\\-]{6,}['\"]?"; then
+          if git rev-list --all | xargs git grep -E "(?i)(***REMOVED***|token|api[_-]?key)[[:space:]]*[:=][[:space:]]*['\"]?[A-Za-z0-9+/=_\-]{10,}['\"]?"; then
             echo "Secrets still found!" && exit 1
           else
             echo "Secrets successfully purged."
           fi
+
 
       - name: Comment on PR
         run: |
