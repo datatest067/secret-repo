@@ -33,22 +33,24 @@ jobs:
       - name: Find potential ***REMOVED***s in history
         run: |
           mkdir -p .***REMOVED***-scan
+          
           for commit in $(git rev-list --all); do
-            git checkout $commit --quiet
-            rg --no-filename --no-line-number -i -e '(***REMOVED***|***REMOVED***|api[_-]?key|***REMOVED***)[\s:=]+[\'"]?[A-Za-z0-9_\-]{6,}[\'"]?' . >> .***REMOVED***-scan/matches.txt || true
+            git checkout "$commit" --quiet || continue
+            rg --no-filename --no-line-number -i -e "\(***REMOVED***\|***REMOVED***\|api[_-]\?key\|***REMOVED***\)[[:space:]:=]\+['\"]\?[A-Za-z0-9_-]\{6,\}['\"]\?" . >> .***REMOVED***-scan/matches.txt || true
           done
-
+          
           sort -u .***REMOVED***-scan/matches.txt > .***REMOVED***-scan/unique.txt
-
+          
           echo "Generating replacements.txt..."
           > replacements.txt
-          while read -r ***REMOVED***; do
-            trimmed=$(echo "$***REMOVED***" | sed -E "s/.*['\"]?([A-Za-z0-9_\-]{6,})['\"]?.*/\1/")
+          while IFS= read -r ***REMOVED***; do
+            trimmed=$(echo "$***REMOVED***" | sed -E "s/.*['\"]?([A-Za-z0-9_-]{6,})['\"]?.*/\1/")
             echo "$trimmed==>REDACTED_SECRET" >> replacements.txt
           done < .***REMOVED***-scan/unique.txt
-
+          
           echo "Secrets to be removed:"
           cat replacements.txt
+
           
       - name: Clean working directory
         run: |
