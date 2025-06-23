@@ -1,7 +1,7 @@
 name: Secret Cleanup Automation
 on:
-  issues:
-    types: [labeled]
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 jobs:
   scan-and-remove:
