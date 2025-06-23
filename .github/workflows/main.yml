@@ -33,42 +33,34 @@ jobs:
       - name: Find potential secrets in history
         run: |
           mkdir -p .secret-scan
-          
-          for commit in $(git rev-list --all); do
-            git checkout "$commit" --quiet || continue
-            rg --no-filename --no-line-number -i -e "\(***REMOVED***\|secret\|api[_-]\?key\|token\)[[:space:]:=]\+['\"]\?[A-Za-z0-9_-]\{6,\}['\"]\?" . >> .secret-scan/matches.txt || true
-          done
-          
-          sort -u .secret-scan/matches.txt > .secret-scan/unique.txt || true
-          
+
+          git rev-list --all | xargs git grep -i -h -E "(***REMOVED***|token|api[_-]?key)[[:space:]]*[:=][[:space:]]*['\"]?[A-Za-z0-9+/=_\\-]{10,}['\"]?" > .secret-scan/matches.txt || true
+
+          sort -u .secret-scan/matches.txt > .secret-scan/unique.txt
+
           echo "Generating replacements.txt..."
-          
-          if [[ -s .secret-scan/unique.txt ]]; then
-            > replacements.txt
-            while IFS= read -r secret; do
-              trimmed=$(echo "$secret" | sed -E "s/.*['\"]?([A-Za-z0-9_-]{6,})['\"]?.*/\1/")
-              echo "$trimmed==>REDACTED_SECRET" >> replacements.txt
-            done < .secret-scan/unique.txt
-          
-            echo "Secrets to be removed:"
-            cat replacements.txt
-          else
-            echo "✅ No secrets detected — skipping replacement."
-            touch replacements.txt  # Create empty file to avoid filter-repo failure
-          fi
+          > replacements.txt
+          while read -r line; do
+            token=$(echo "$line" | grep -oE "[A-Za-z0-9+/=_\\-]{10,}")
+            if [[ -n "$token" ]]; then
+              echo "$token==>REDACTED_SECRET" >> replacements.txt
+            fi
+          done < .secret-scan/unique.txt
+
+          echo "Replacement map:"
+          cat replacements.txt
 
 
           
-      # - name: Clean working directory
-      #   run: |
-      #     git clean -xfd
-  
-      - name: Clean repository
+      - name: Sanitize git history
         run: |
-          git filter-repo --force --replace-text replacements.txt
-
-      # - name: Run git-filter-repo
-      #   if: success() && hashFiles('replacements.txt') != ''
+          if [ -s replacements.txt ]; then
+            git filter-repo --force --replace-text replacements.txt
+          else
+            echo "No secrets found, skipping filter-repo"
+          fi
+  
+      # - name: Clean repository
       #   run: |
       #     git filter-repo --force --replace-text replacements.txt
 
@@ -91,10 +83,8 @@ jobs:
             echo "Secrets successfully purged."
           fi
 
-
-
       - name: Comment on PR
         run: |
-          gh pr comment ${{ github.event.pull_request.number }} --body "Purge complete. Backup created as a release. Please verify the repository. All branches and tags were processed."
+          gh pr comment ${{ github.event.pull_request.number }} --body "✅ Secrets purged from git history. Backup created as a release. Please verify."
         env:
           GITHUB_TOKEN: ${{ secrets.MY_SECRET }}
