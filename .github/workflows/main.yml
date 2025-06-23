@@ -165,6 +165,8 @@ jobs:
         run: |
           git push --force --all
           git push --force --tags
+        env:
+          GITHUB_TOKEN: ${{ secrets.MY_SECRET }}
 
       - name: Validate cleaned repository
         run: |
