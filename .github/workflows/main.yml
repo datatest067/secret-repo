@@ -163,9 +163,23 @@ jobs:
 
       - name: Force-push all refs
         run: |
-          git remote set-url origin https://datatest067:${***REMOVED***}@github.com/${GITHUB_REPOSITORY}.git
+          echo "Force-pushing all branches and tags..."
+          echo "Current branches:"
+          git branch -a
+          echo "Current tags:"
+          git tag -l
+          echo "Remote configuration:"
+          git remote -v
+          
+          # Force push all branches
+          echo "Pushing all branches..."
           git push --force --all
+          
+          # Force push all tags
+          echo "Pushing all tags..."
           git push --force --tags
+          
+          echo "Force-push completed successfully!"
         env:
           ***REMOVED***: ${{ ***REMOVED***s.MY_SECRET }}
 
