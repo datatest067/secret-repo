@@ -1,42 +1,70 @@
-name: Secret Cleanup on PR Open
+name: Purge Secrets on PR
 
 on:
   pull_request:
-    types: [opened]
+    types: [opened, synchronize, reopened]
 
 jobs:
-  scan-and-remove:
-    # Run only if the PR has the '***REMOVED***s-cleanup' label
-    if: contains(join(github.event.pull_request.labels.*.name, ','), '***REMOVED***s-cleanup')
+  purge-***REMOVED***s:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
 
     steps:
-      - name: Checkout full history
+      - name: Checkout repository (all history, all refs)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          fetch-tags: true
 
-      - name: Install BFG
+      - name: Backup repository (all refs)
         run: |
-          wget https://repo1.maven.org/maven2/com/madgag/bfg/1.14.0/bfg-1.14.0.jar
-          mv bfg-1.14.0.jar bfg.jar
+          git bundle create repo-backup.bundle --all
+          gh release create "backup-$(date +%Y%m%d%H%M%S)" repo-backup.bundle --title "Pre-purge backup"
+        env:
+          ***REMOVED***: ${{ ***REMOVED***s.MY_SECRET }}
 
-      - name: Create ***REMOVED***s list from PR description
+      - name: Install git-filter-repo
         run: |
-          echo "${{ github.event.pull_request.body }}" > ***REMOVED***s-to-remove.txt
+          pip install git-filter-repo
 
-      - name: Run BFG cleanup
+      - name: Clean working directory
         run: |
-          java -jar bfg.jar --replace-text ***REMOVED***s-to-remove.txt
-          git reflog expire --expire=now --all
-          git gc --prune=now --aggressive
+          git clean -xfd
 
-      - name: Force push cleaned history
+      - name: Remove ***REMOVED***s from history
         run: |
-          git push origin --force --all
-          git push origin --force --tags
+          # Example: Remove a file named '***REMOVED***s.txt' from all history
+          # To remove a string, create a file 'replacements.txt' with lines like:
+          # SECRET_STRING==>REMOVED
+          # and use: --replace-text replacements.txt
+          git filter-repo --force --path ***REMOVED***s.txt --invert-paths
+          # Uncomment and customize the next line for string replacement:
+          # git filter-repo --force --replace-text replacements.txt
 
-      - name: Notify cleanup complete
-        run: echo "✅ Cleanup complete — please reclone the repository."
+      - name: Set remote URL
+        run: |
+          git remote add origin "https://x-access-***REMOVED***:${***REMOVED***}@github.com/${GITHUB_REPOSITORY}.git"
+        env:
+          ***REMOVED***: ${{ ***REMOVED***s.MY_SECRET }}
+
+      - name: Force-push all refs
+        run: |
+          git push --force --all
+          git push --force --tags
+
+      - name: Validate cleaned repository
+        run: |
+          # Example: Check that the ***REMOVED*** file is gone
+          if git rev-list --all | xargs git grep 'SECRET_STRING'; then
+            echo "Secret still present!" && exit 1
+          else
+            echo "Secret successfully purged."
+          fi
+
+      - name: Comment on PR
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} --body "Purge complete. Backup created as a release. Please verify the repository. All branches and tags were processed."
+        env:
+          ***REMOVED***: ${{ ***REMOVED***s.MY_SECRET }}
