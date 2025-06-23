@@ -23,7 +23,7 @@ jobs:
           git bundle create repo-backup.bundle --all
           gh release create "backup-$(date +%Y%m%d%H%M%S)" repo-backup.bundle --title "Pre-purge backup"
         env:
-          ***REMOVED***: ${{ ***REMOVED***s.***REMOVED*** }}
+          ***REMOVED***: ${{ ***REMOVED***s.MY_SECRET }}
 
       - name: Install git-filter-repo
         run: |
@@ -45,9 +45,9 @@ jobs:
 
       - name: Set remote URL
         run: |
-          git remote set-url origin "https://x-access-***REMOVED***:${***REMOVED***}@github.com/${GITHUB_REPOSITORY}.git"
+          git remote set-url origin "https://x-access-***REMOVED***:${MY_SECRET}@github.com/${GITHUB_REPOSITORY}.git"
         env:
-          ***REMOVED***: ${{ ***REMOVED***s.***REMOVED*** }}
+          ***REMOVED***: ${{ ***REMOVED***s.MY_SECRET }}
 
       - name: Force-push all refs
         run: |
@@ -67,4 +67,4 @@ jobs:
         run: |
           gh pr comment ${{ github.event.pull_request.number }} --body "Purge complete. Backup created as a release. Please verify the repository. All branches and tags were processed."
         env:
-          ***REMOVED***: ${{ ***REMOVED***s.***REMOVED*** }}
+          ***REMOVED***: ${{ ***REMOVED***s.MY_SECRET }}
