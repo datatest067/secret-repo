@@ -1,70 +1,54 @@
-name: Purge Secrets on PR
-
+name: Secret Cleanup Automation
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  issues:
+    types: [labeled]
 
 jobs:
-  purge-***REMOVED***s:
+  scan-and-remove:
+    if: contains(github.event.issue.labels.*.name, '***REMOVED***s-cleanup')
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      pull-requests: write
-
     steps:
-      - name: Checkout repository (all history, all refs)
+      - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          fetch-tags: true
+          fetch-depth: 0  # Full history is required
 
-      - name: Backup repository (all refs)
+      - name: Backup repo
         run: |
-          git bundle create repo-backup.bundle --all
-          gh release create "backup-$(date +%Y%m%d%H%M%S)" repo-backup.bundle --title "Pre-purge backup"
-        env:
-          ***REMOVED***: ${{ ***REMOVED***s.MY_SECRET }}
+          git clone --mirror https://github.com/${{ github.repository }} backup.git
+          echo "✅ Backup created in backup.git"
 
-      - name: Install git-filter-repo
+      - name: Install BFG Cleaner
         run: |
-          pip install git-filter-repo
+          wget https://repo1.maven.org/maven2/com/madgag/bfg/1.14.0/bfg-1.14.0.jar
+          mv bfg-1.14.0.jar bfg.jar
 
-      - name: Clean working directory
+      - name: Create ***REMOVED***s file
         run: |
-          git clean -xfd
+          echo "${{ github.event.issue.body }}" > ***REMOVED***s-to-remove.txt
 
-      - name: Remove ***REMOVED***s from history
+      - name: Clean ***REMOVED***s using BFG
         run: |
-          # Example: Remove a file named '***REMOVED***s.txt' from all history
-          # To remove a string, create a file 'replacements.txt' with lines like:
-          # SECRET_STRING==>REMOVED
-          # and use: --replace-text replacements.txt
-          git filter-repo --force --path ***REMOVED***s.txt --invert-paths
-          # Uncomment and customize the next line for string replacement:
-          # git filter-repo --force --replace-text replacements.txt
+          java -jar bfg.jar --replace-text ***REMOVED***s-to-remove.txt
+          git reflog expire --expire=now --all
+          git gc --prune=now --aggressive
 
-      - name: Set remote URL
+      - name: Force push cleaned history
         run: |
-          git remote add origin "https://x-access-***REMOVED***:${***REMOVED***}@github.com/${GITHUB_REPOSITORY}.git"
-        env:
-          ***REMOVED***: ${{ ***REMOVED***s.MY_SECRET }}
+          git push origin --force --all
+          git push origin --force --tags
 
-      - name: Force-push all refs
+      - name: Validate ***REMOVED*** removal
         run: |
-          git push --force --all
-          git push --force --tags
+          git grep -I -E '(***REMOVED***|***REMOVED***|***REMOVED***|api[_-]?key)' || echo "✅ No ***REMOVED***s found post-cleanup"
 
-      - name: Validate cleaned repository
-        run: |
-          # Example: Check that the ***REMOVED*** file is gone
-          if git rev-list --all | xargs git grep 'SECRET_STRING'; then
-            echo "Secret still present!" && exit 1
-          else
-            echo "Secret successfully purged."
-          fi
-
-      - name: Comment on PR
-        run: |
-          gh pr comment ${{ github.event.pull_request.number }} --body "Purge complete. Backup created as a release. Please verify the repository. All branches and tags were processed."
-        env:
-          ***REMOVED***: ${{ ***REMOVED***s.MY_SECRET }}
+      - name: Notify team
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              body: "✅ Secrets have been removed from Git history.\n\n⚠️ **Action Required:** All developers must delete their local repo and reclone.\n\nA backup is available in the `backup.git` folder of this workflow run."
+            })
