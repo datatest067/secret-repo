@@ -163,7 +163,7 @@ jobs:
 
       - name: Force-push all refs
         run: |
-          git remote set-url origin https://datatest067:${***REMOVED***}@github.com/${GITHUB_REPOSITORY}.git
+          git remote add origin https://datatest067:${***REMOVED***}@github.com/${GITHUB_REPOSITORY}.git
           git push --force --all
           git push --force --tags
         env:
