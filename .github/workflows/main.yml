@@ -43,6 +43,12 @@ jobs:
           # Uncomment and customize the next line for string replacement:
           # git filter-repo --force --replace-text replacements.txt
 
+      - name: Set remote URL
+        run: |
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Force-push all refs
         run: |
           git push --force --all
