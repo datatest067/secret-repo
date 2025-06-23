@@ -163,6 +163,8 @@ jobs:
 
       - name: Force-push all refs
         run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git push --force --all
           git push --force --tags
         env:
