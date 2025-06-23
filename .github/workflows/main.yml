@@ -29,15 +29,19 @@ jobs:
         run: |
           pip install git-filter-repo
 
+      - name: Clean working directory
+        run: |
+          git clean -xfd
+
       - name: Remove secrets from history
         run: |
           # Example: Remove a file named 'secrets.txt' from all history
           # To remove a string, create a file 'replacements.txt' with lines like:
           # SECRET_STRING==>REMOVED
           # and use: --replace-text replacements.txt
-          git filter-repo --path secrets.txt --invert-paths
+          git filter-repo --force --path secrets.txt --invert-paths
           # Uncomment and customize the next line for string replacement:
-          # git filter-repo --replace-text replacements.txt
+          # git filter-repo --force --replace-text replacements.txt
 
       - name: Force-push all refs
         run: |
