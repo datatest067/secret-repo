@@ -1,36 +1,33 @@
-name: Secret Cleanup Automation
+name: Secret Cleanup on PR Open
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened]
 
 jobs:
-  purge-secrets:
+  scan-and-remove:
+    # Run only if the PR has the 'secrets-cleanup' label
+    if: contains(join(github.event.pull_request.labels.*.name, ','), 'secrets-cleanup')
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      pull-requests: write
+
     steps:
-      - name: Checkout repo
+      - name: Checkout full history
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history is required
+          fetch-depth: 0
 
-      - name: Backup repo
-        run: |
-          git clone --mirror https://github.com/${{ github.repository }} backup.git
-          echo "✅ Backup created in backup.git"
-
-      - name: Install BFG Cleaner
+      - name: Install BFG
         run: |
           wget https://repo1.maven.org/maven2/com/madgag/bfg/1.14.0/bfg-1.14.0.jar
           mv bfg-1.14.0.jar bfg.jar
 
-      - name: Create secrets file
+      - name: Create secrets list from PR description
         run: |
-          echo "${{ github.event.issue.body }}" > secrets-to-remove.txt
+          echo "${{ github.event.pull_request.body }}" > secrets-to-remove.txt
 
-      - name: Clean secrets using BFG
+      - name: Run BFG cleanup
         run: |
           java -jar bfg.jar --replace-text secrets-to-remove.txt
           git reflog expire --expire=now --all
@@ -41,15 +38,5 @@ jobs:
           git push origin --force --all
           git push origin --force --tags
 
-      - name: Validate secret removal
-        run: |
-          git grep -I -E '(password|secret|token|api[_-]?key)' || echo "✅ No secrets found post-cleanup"
-
-      - name: Notify team
-        uses: actions/github-script@v6
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              body: "✅ Secrets have been removed from Git history.\n\n⚠️ **Action Required:** All developers must delete their local repo and reclone.\n\nA backup is available in the `backup.git` folder of this workflow run."
-            })
+      - name: Notify cleanup complete
+        run: echo "✅ Cleanup complete — please reclone the repository."
