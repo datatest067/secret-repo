@@ -255,7 +255,6 @@ jobs:
       - name: Comment on PR
         run: |
           cd repo.git  # ensure you're inside the git repo
-          git remote add origin https://github.com/$REPO_NAME.git || true
           if [ -s replacements.txt ]; then
             SECRET_COUNT=$(grep -c "==>" replacements.txt || echo "0")
             gh pr comment ${{ github.event.pull_request.number }} --body "Purge complete! Removed $SECRET_COUNT hardcoded secrets from repository history. Backup created as a release. Please verify the repository."
