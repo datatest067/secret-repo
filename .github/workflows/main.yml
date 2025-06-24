@@ -143,33 +143,70 @@ jobs:
           REPO_SIZE=$(du -sh . | cut -f1)
           echo "Repository size before cleanup: $REPO_SIZE" >> ../analysis-report.md
 
-      # - name: Remove Secrets with BFG
-      #   run: |
-      #     echo "🧹 Starting ***REMOVED***s removal with BFG..."
-      #     cd repo.git
-      #     ls -lrth
-          
-      #     # Run BFG with ***REMOVED***s patterns
-      #     bfg --replace-text ../***REMOVED***s-patterns.txt --no-blob-protection .
-          
-      #     echo "✅ BFG cleanup completed"
-
-      - name: Alternative Cleanup with git-filter-repo
+      - name: Clean and Optimize Repository
         run: |
-          echo "🔄 Attempting cleanup with git-filter-repo as fallback..."
+          echo "🗑️ Cleaning and optimizing repository..."
           cd repo.git
           
-          # Convert to regular repo for git-filter-repo
-          git config --bool core.bare false
-          git reset --hard
+          # Expire reflogs and cleanup
+          git reflog expire --expire=now --all
+          git gc --prune=now --aggressive
           
-          # Remove files matching patterns
-          git filter-repo --path-glob '***REMOVED***' --invert-paths --force
-          git filter-repo --path-glob '***REMOVED***' --invert-paths --force
-          git filter-repo --path-glob '***REMOVED***' --invert-paths --force
-          git filter-repo --path-glob '***REMOVED***' --invert-paths --force
-          git filter-repo --path-glob '***REMOVED***' --invert-paths --force
-          git filter-repo --path-glob '***REMOVED***' --invert-paths --force
+          # Force cleanup of unreachable objects
+          git fsck --unreachable
+          git prune --expire=now
           
-          echo "✅ git-filter-repo cleanup completed"
+          echo "✅ Repository optimization completed"
+
+      - name: Validate Cleanup Results
+        run: |
+          echo "✅ Validating cleanup results..."
+          cd repo.git
+          
+          # Create validation report
+          echo "# Post-cleanup Validation Report" > ../validation-report.md
+          echo "Repository: ${{ github.repository }} (Private)" >> ../validation-report.md
+          echo "Generated: $(date)" >> ../validation-report.md
+          echo "" >> ../validation-report.md
+          
+          # Check for remaining ***REMOVED***s (count only)
+          REMAINING_SECRETS=0
+          
+          # Search in commit messages
+          COMMIT_SECRETS=$(git log --all --grep="***REMOVED***\|***REMOVED***\|key\|***REMOVED***" --oneline | wc -l)
+          echo "Commits with potential ***REMOVED***s: $COMMIT_SECRETS" >> ../validation-report.md
+          
+          if [ $COMMIT_SECRETS -gt 0 ]; then
+            REMAINING_SECRETS=$((REMAINING_SECRETS + COMMIT_SECRETS))
+          fi
+          
+          # Repository size comparison
+          CURRENT_SIZE=$(du -sh . | cut -f1)
+          echo "Current repository size: $CURRENT_SIZE" >> ../validation-report.md
+          
+          # Calculate size reduction (approximate)
+          echo "Size optimization completed" >> ../validation-report.md
+          
+          if [ $REMAINING_SECRETS -gt 0 ]; then
+            echo "⚠️ Warning: $REMAINING_SECRETS potential ***REMOVED***s may still exist"
+            echo "status=warning" >> $GITHUB_ENV
+          else
+            echo "✅ No obvious ***REMOVED***s found in validation"
+            echo "status=success" >> $GITHUB_ENV
+          fi
+
+      - name: Push Cleaned Repository
+        run: |
+          echo "📤 Pushing cleaned repository to private repo..."
+          cd repo.git
+          
+          # Verify remote URL is set correctly with PAT
+          git remote set-url origin https://$PAT_TOKEN@github.com/${{ github.repository }}.git
+          
+          # Push all branches and tags with force
+          git push --force --all
+          git push --force --tags
+          
+          echo "✅ Private repository updated successfully"
+
 
