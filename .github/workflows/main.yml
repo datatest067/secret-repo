@@ -191,20 +191,7 @@ jobs:
               issue_number: prNumber,
               body: `## ${statusEmoji} Secrets Cleanup ${statusText}
 
-**Repository:** ${{ env.REPO_NAME }}
 
-### 📊 Analysis Report
-\`\`\`
-${analysisReport}
-\`\`\`
-
-### ✅ Validation Report
-\`\`\`
-${validationReport}
-\`\`\`
-
-Artifacts uploaded: cleanup-backup-and-reports-${{ github.run_number }} (30 days retention)`
-            });
 
   cleanup-on-failure:
     needs: [validate-request, clean-repository]
@@ -223,8 +210,6 @@ Artifacts uploaded: cleanup-backup-and-reports-${{ github.run_number }} (30 days
               issue_number: prNumber,
               body: `## ❌ Secrets Cleanup Failed
 
-The secrets cleanup process encountered an error and was aborted. Please check the logs.`
-            });
             await github.rest.issues.addLabels({
               owner: context.repo.owner,
               repo: context.repo.repo,
