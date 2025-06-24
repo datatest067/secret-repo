@@ -32,7 +32,7 @@ jobs:
           git config --global user.email "actions@github.com"
           
           # Clone with PAT authentication for private repo
-          git clone --mirror https://$PAT_TOKEN@github.com/${{ github.repository }}.git repo.git
+          git clone https://$PAT_TOKEN@github.com/${{ github.repository }}.git repo.git
           cd repo.git
           
           # Fetch all references
