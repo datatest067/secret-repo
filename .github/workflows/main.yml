@@ -41,44 +41,35 @@ jobs:
           
           echo "✅ Private repository cloned successfully"
 
-      - name: Create Comprehensive Backup
+      - name: Create Archive Backups for Remote Branches
         run: |
-          echo "💾 Creating comprehensive backup..."
-          mkdir -p $BACKUP_DIR
+          echo "📦 Creating archive backups for all remote-tracking branches..."
           cd repo.git
-          
-          # Create bundle backup (most reliable for private repos)
-          git bundle create ../$BACKUP_DIR/complete-backup.bundle --all
-          
-          # Verify bundle integrity
-          git bundle verify ../$BACKUP_DIR/complete-backup.bundle
-          
-          # Create archive backups for each branch
-          for branch in $(git branch -r | grep -v HEAD | sed 's/origin\///'); do
-            echo "Backing up branch: $branch"
-            git archive $branch --format=tar.gz --output="../$BACKUP_DIR/branch_${branch//\//_}.tar.gz"
+          mkdir -p "../$BACKUP_DIR"
+      
+          # List all remote branches except HEAD and pull/refs
+          for branch in $(git branch -r | grep -vE 'HEAD|pull/'); do
+            local_branch="${branch#origin/}"
+            archive_name="branch_${local_branch//\//_}.tar.gz"
+      
+            echo "📦 Archiving $branch -> $archive_name"
+            git archive "$branch" --format=tar.gz --output="../$BACKUP_DIR/$archive_name"
           done
-          
-          # Create archive backups for each tag
+      
+          echo "✅ Branch archive backups created in $BACKUP_DIR"
+      
+      - name: Create Archive Backups for Tags
+        run: |
+          echo "🏷️ Creating archive backups for tags..."
+          cd repo.git
+      
           for tag in $(git tag); do
-            echo "Backing up tag: $tag"
-            git archive $tag --format=tar.gz --output="../$BACKUP_DIR/tag_${tag}.tar.gz"
+            archive_name="tag_${tag//\//_}.tar.gz"
+            echo "🏷️ Archiving tag: $tag -> $archive_name"
+            git archive "$tag" --format=tar.gz --output="../$BACKUP_DIR/$archive_name"
           done
-          
-          # Save repository metadata
-          git log --all --oneline > ../$BACKUP_DIR/commit-history.txt
-          git branch -a > ../$BACKUP_DIR/branches.txt
-          git tag -l > ../$BACKUP_DIR/tags.txt
-          git remote -v > ../$BACKUP_DIR/remotes.txt
-          
-          # Save repository permissions info
-          echo "Repository: ${{ github.repository }}" > ../$BACKUP_DIR/repo-info.txt
-          echo "Private: true" >> ../$BACKUP_DIR/repo-info.txt
-          echo "Backup Date: $(date)" >> ../$BACKUP_DIR/repo-info.txt
-          
-          echo "✅ Backup created successfully"
-          ls -la ../$BACKUP_DIR/
-
+      
+          echo "✅ Tag archive backups created in $BACKUP_DIR"
 
       - name: Install git-filter-repo
         run: |
