@@ -260,6 +260,10 @@ jobs:
               # List branches and clean them
               for branch in $(git branch -r | grep -vE 'origin/HEAD|pull/' | sed 's|origin/||'); do
                 CLEAN_BRANCH="cleanup/${branch//\//_}"
+                
+              echo "♻️ Cleaning up working tree before next branch"
+              git reset --hard
+              git clean -fd
               
                 echo "🔧 Checking out branch: $branch"
                 git checkout -B "$CLEAN_BRANCH" "origin/$branch"
