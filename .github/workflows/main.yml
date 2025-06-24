@@ -97,9 +97,9 @@ jobs:
           # Install git-filter-repo as backup
           pip3 install git-filter-repo
 
-      - name: Clean working directory
-        run: |
-          git clean -xfd
+      # - name: Clean working directory
+      #   run: |
+      #     git clean -xfd
           
       - name: Auto-detect and remove hardcoded secrets
         run: |
