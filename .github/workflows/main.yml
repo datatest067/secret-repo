@@ -199,6 +199,9 @@ jobs:
         run: |
           echo "📤 Pushing cleaned repository to private repo..."
           cd repo.git
+          for ref in $(git for-each-ref --format='%(refname)' refs/pull); do
+            git update-ref -d "$ref"
+          done
           
           # Verify remote URL is set correctly with PAT
           git remote set-url origin https://$PAT_TOKEN@github.com/${{ github.repository }}.git
