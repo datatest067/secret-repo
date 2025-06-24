@@ -184,11 +184,11 @@ jobs:
             echo "No secrets detected to remove."
           fi
 
-      - name: Set remote URL
-        run: |
-          git remote add origin https://datatest067:***REMOVED***@github.com/datatest067/secret-repo.git"
-        env:
-          GITHUB_TOKEN: ${{ secrets.MY_SECRET }}
+      # - name: Set remote URL
+      #   run: |
+      #     git remote add origin https://datatest067:***REMOVED***@github.com/datatest067/secret-repo.git"
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.MY_SECRET }}
           
       - name: Push Cleaned Repository
         run: |
