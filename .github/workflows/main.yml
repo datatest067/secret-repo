@@ -190,19 +190,19 @@ jobs:
       #   env:
       #     GITHUB_TOKEN: ${{ secrets.MY_SECRET }}
           
-      - name: Push Cleaned Repository
-        run: |
-          echo "📤 Pushing cleaned repository to private repo..."
-          cd repo.git
+      # - name: Push Cleaned Repository
+      #   run: |
+      #     echo "📤 Pushing cleaned repository to private repo..."
+      #     cd repo.git
           
-          # Verify remote URL is set correctly with PAT
-          git remote set-url origin https://$PAT_TOKEN@github.com/${{ github.repository }}.git
+      #     # Verify remote URL is set correctly with PAT
+      #     git remote set-url origin https://$PAT_TOKEN@github.com/${{ github.repository }}.git
           
-          # Push all branches and tags with force
-          git push --force --all
-          git push --force --tags
+      #     # Push all branches and tags with force
+      #     git push --force --all
+      #     git push --force --tags
           
-          echo "✅ Private repository updated successfully"
+      #     echo "✅ Private repository updated successfully"
 
       - name: Validate cleaned repository
         run: |
