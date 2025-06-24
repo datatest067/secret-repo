@@ -143,15 +143,16 @@ jobs:
           REPO_SIZE=$(du -sh . | cut -f1)
           echo "Repository size before cleanup: $REPO_SIZE" >> ../analysis-report.md
 
-      - name: Remove Secrets with BFG
-        run: |
-          echo "🧹 Starting ***REMOVED***s removal with BFG..."
-          cd repo.git
+      # - name: Remove Secrets with BFG
+      #   run: |
+      #     echo "🧹 Starting ***REMOVED***s removal with BFG..."
+      #     cd repo.git
+      #     ls -lrth
           
-          # Run BFG with ***REMOVED***s patterns
-          bfg --replace-text ../***REMOVED***s-patterns.txt --no-blob-protection .
+      #     # Run BFG with ***REMOVED***s patterns
+      #     bfg --replace-text ../***REMOVED***s-patterns.txt --no-blob-protection .
           
-          echo "✅ BFG cleanup completed"
+      #     echo "✅ BFG cleanup completed"
 
       - name: Alternative Cleanup with git-filter-repo
         run: |
@@ -172,18 +173,3 @@ jobs:
           
           echo "✅ git-filter-repo cleanup completed"
 
-      - name: Clone Private Repository
-        run: |
-          echo "📥 Cloning private repository with PAT..."
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          
-          # Clone with PAT authentication for private repo
-          git clone --mirror https://${{ ***REMOVED***s.PAT_TOKEN }}@github.com/${{ github.repository }}.git repo.git
-          cd repo.git
-          
-          # Fetch all references
-          git fetch --all --tags --prune
-          git remote set-url origin https://${{ ***REMOVED***s.PAT_TOKEN }}@github.com/${{ github.repository }}.git
-          
-          echo "✅ Private repository cloned successfully"
