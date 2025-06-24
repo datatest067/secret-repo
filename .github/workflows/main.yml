@@ -261,7 +261,13 @@ jobs:
           # Loop over original branches (exclude cleanup/* and HEAD)
           for branch in $(git branch -r | grep -vE 'origin/HEAD|origin/cleanup/' | sed 's|origin/||'); do
             CLEAN_BRANCH="cleanup/${branch//\//_}"
-          
+
+            # Clean possible overwritten workflows
+            git restore .github/workflows/main.yml || true
+            git reset --hard
+            git clean -fd
+
+
             echo "🔧 Checking out branch: $branch"
             git checkout -B "$CLEAN_BRANCH" "origin/$branch"
           
