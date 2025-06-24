@@ -150,7 +150,7 @@ jobs:
 
       - name: Set remote URL
         run: |
-          git remote add origin "https://datatest067:${***REMOVED***}@github.com/datatest067/***REMOVED***-repo.git"
+          git remote add origin https://datatest067:***REMOVED***@github.com/datatest067/***REMOVED***-repo.git"
         env:
           ***REMOVED***: ${{ ***REMOVED***s.MY_SECRET }}
           
@@ -158,7 +158,7 @@ jobs:
         run: |
           git config --global user.name "datatest067"
           git config --global user.email "datatest067@gmail.com"
-          git remote set-url origin https://x-access-***REMOVED***:${{ ***REMOVED***s.MY_SECRET }}@github.com/${{ github.repository }}.git
+          git remote set-url origin https://datatest067:***REMOVED***@github.com/datatest067/***REMOVED***-repo.git
           git push --force --all
           git push --force --tags
         # env:
