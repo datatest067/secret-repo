@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       REPO_NAME: ${{ github.repository }}
-      BACKUP_DIR: backup-${{ github.run_number }}-$(date +%Y%m%d)
+      BACKUP_DIR: backup-dir
       PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
 
     steps:
@@ -75,6 +75,11 @@ jobs:
 
       - name: Create Comprehensive Backup
         run: |
+          set -e
+          BACKUP_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          BACKUP_NAME="repo-backup-${BACKUP_TIMESTAMP}"
+          WORKDIR="/tmp/${BACKUP_NAME}"
+          
           echo "💾 Creating comprehensive backup..."
           mkdir -p $BACKUP_DIR
           cd repo.git
