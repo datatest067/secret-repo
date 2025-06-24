@@ -154,14 +154,11 @@ jobs:
         env:
           ***REMOVED***: ${{ ***REMOVED***s.MY_SECRET }}
           
-      - name: Configure Git
+      - name: Force-push all refs
         run: |
           git config --global user.name "datatest067"
           git config --global user.email "datatest067@gmail.com"
           git remote set-url origin https://x-access-***REMOVED***:${{ ***REMOVED***s.MY_SECRET }}@github.com/${{ github.repository }}.git
-
-      - name: Force-push all refs
-        run: |
           git push --force --all
           git push --force --tags
         # env:
