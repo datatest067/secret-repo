@@ -338,9 +338,9 @@ jobs:
             git clean -fd
           
           done
-          env:
-            PAT_TOKEN: ${{ ***REMOVED***s.PAT_TOKEN }}
-            REPO_NAME: datatest067/***REMOVED***-repo
+          # env:
+          #   PAT_TOKEN: ${{ ***REMOVED***s.PAT_TOKEN }}
+          #   REPO_NAME: datatest067/***REMOVED***-repo
 
 
 
