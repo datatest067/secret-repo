@@ -163,11 +163,12 @@ jobs:
 
       - name: Force-push all refs
         run: |
-          git config --global user.name "datatest067"
-          git config --global user.email "datatest067@gmail.com"
-          git remote set-url origin https://x-access-token:${{ secrets.MY_SECRET }}@github.com/datatest067/secret-repo.git
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git push --force --all
           git push --force --tags
+        env:
+          GITHUB_TOKEN: ${{ secrets.MY_SECRET }}
 
       - name: Validate cleaned repository
         run: |
