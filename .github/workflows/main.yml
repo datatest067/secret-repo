@@ -258,7 +258,7 @@ jobs:
               git reset --hard
           
               # List branches and clean them
-              for branch in $(git for-each-ref --format='%(refname:short)' refs/remotes/origin | grep -Ev 'HEAD$|^origin$|pull/'); do
+              for branch in $(git for-each-ref --format='%(refname:strip=2)' refs/remotes/origin | grep -vE '^HEAD$'); do
                 CLEAN_BRANCH="cleanup/${branch//\//_}"
               
                 echo "🔧 Checking out branch: $branch"
