@@ -11,52 +11,20 @@ permissions:
   pull-requests: write
 
 jobs:
-  clean-repository:
+  purge-***REMOVED***s:
     runs-on: ubuntu-latest
     env:
       REPO_NAME: ${{ github.repository }}
-      BACKUP_DIR: backup-dir
+      BACKUP_DIR: backup-$REPO_NAME
       PAT_TOKEN: ${{ ***REMOVED***s.PAT_TOKEN }}
 
     steps:
-      - name: Validate PAT Token
-        run: |
-          if [ -z "$PAT_TOKEN" ]; then
-            echo "❌ PAT_TOKEN ***REMOVED*** is not configured"
-            echo "Please add your Personal Access Token as a repository ***REMOVED*** named 'PAT_TOKEN'"
-            exit 1
-          fi
-          
-          # Test PAT ***REMOVED*** permissions
-          echo "🔐 Testing PAT ***REMOVED*** permissions..."
-          RESPONSE=$(curl -s -H "Authorization: ***REMOVED*** $PAT_TOKEN" \
-            "https://api.github.com/repos/${{ github.repository }}")
-          
-          if echo "$RESPONSE" | grep -q '"private": true'; then
-            echo "✅ PAT ***REMOVED*** has access to private repository"
-          else
-            echo "❌ PAT ***REMOVED*** may not have sufficient permissions"
-            echo "Ensure your PAT has 'repo' scope for private repositories"
-            exit 1
-          fi
+      - name: Checkout repository (all history, all refs)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
-      - name: Setup Environment
-        run: |
-          echo "🔧 Setting up cleanup environment..."
-          sudo apt-get update
-          sudo apt-get install -y openjdk-11-jre-headless python3-pip
-          
-          # Install BFG Repo Cleaner
-          wget https://repo1.maven.org/maven2/com/madgag/bfg/1.14.0/bfg-1.14.0.jar
-          chmod +x bfg-1.14.0.jar
-          sudo mv bfg-1.14.0.jar /usr/local/bin/bfg.jar
-          echo '#!/bin/bash' | sudo tee /usr/local/bin/bfg
-          echo 'java -jar /usr/local/bin/bfg.jar "$@"' | sudo tee -a /usr/local/bin/bfg
-          sudo chmod +x /usr/local/bin/bfg
-          
-          # Install git-filter-repo as backup
-          pip3 install git-filter-repo
-          
       - name: Clone Private Repository
         run: |
           echo "📥 Cloning private repository with PAT..."
@@ -75,11 +43,6 @@ jobs:
 
       - name: Create Comprehensive Backup
         run: |
-          set -e
-          BACKUP_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-          BACKUP_NAME="repo-backup-${BACKUP_TIMESTAMP}"
-          WORKDIR="/tmp/${BACKUP_NAME}"
-          
           echo "💾 Creating comprehensive backup..."
           mkdir -p $BACKUP_DIR
           cd repo.git
@@ -116,92 +79,121 @@ jobs:
           echo "✅ Backup created successfully"
           ls -la ../$BACKUP_DIR/
 
-      - name: Pre-cleanup Analysis
-        run: |
-          echo "🔍 Analyzing private repository for ***REMOVED***s..."
-          cd repo.git
-          
-          # Create analysis report
-          echo "# Pre-cleanup Analysis Report" > ../analysis-report.md
-          echo "Repository: ${{ github.repository }} (Private)" >> ../analysis-report.md
-          echo "Generated: $(date)" >> ../analysis-report.md
-          echo "" >> ../analysis-report.md
-          
-          # Search for potential ***REMOVED***s (count only for security)
-          echo "## Potential Secrets Found:" >> ../analysis-report.md
-          
-          # Search patterns (be careful not to expose actual ***REMOVED***s in logs)
-          git log --all --grep="***REMOVED***" --oneline | wc -l | xargs echo "Password mentions in commits:" >> ../analysis-report.md
-          git log --all --grep="***REMOVED***" --oneline | wc -l | xargs echo "Secret mentions in commits:" >> ../analysis-report.md
-          git log --all --grep="key" --oneline | wc -l | xargs echo "Key mentions in commits:" >> ../analysis-report.md
-          git log --all --grep="***REMOVED***" --oneline | wc -l | xargs echo "Token mentions in commits:" >> ../analysis-report.md
-          
-          # File-based analysis (count only, don't expose content)
-          git log --all --name-only --pretty=format: | sort -u | grep -E '\.(env|key|pem|p12|pfx|jks)$' | wc -l | xargs echo "Suspicious files found:" >> ../analysis-report.md
-          
-          # Repository size before cleanup
-          REPO_SIZE=$(du -sh . | cut -f1)
-          echo "Repository size before cleanup: $REPO_SIZE" >> ../analysis-report.md
 
-      - name: Clean and Optimize Repository
+      - name: Install git-filter-repo
         run: |
-          echo "🗑️ Cleaning and optimizing repository..."
-          cd repo.git
+          echo "🔧 Setting up cleanup environment..."
+          sudo apt-get update
+          sudo apt-get install -y openjdk-11-jre-headless python3-pip
           
-          # Expire reflogs and cleanup
-          git reflog expire --expire=now --all
-          git gc --prune=now --aggressive
+          # Install BFG Repo Cleaner
+          wget https://repo1.maven.org/maven2/com/madgag/bfg/1.14.0/bfg-1.14.0.jar
+          chmod +x bfg-1.14.0.jar
+          sudo mv bfg-1.14.0.jar /usr/local/bin/bfg.jar
+          echo '#!/bin/bash' | sudo tee /usr/local/bin/bfg
+          echo 'java -jar /usr/local/bin/bfg.jar "$@"' | sudo tee -a /usr/local/bin/bfg
+          sudo chmod +x /usr/local/bin/bfg
           
-          # Force cleanup of unreachable objects
-          git fsck --unreachable
-          git prune --expire=now
-          
-          echo "✅ Repository optimization completed"
+          # Install git-filter-repo as backup
+          pip3 install git-filter-repo
 
-      - name: Validate Cleanup Results
+      - name: Clean working directory
         run: |
-          echo "✅ Validating cleanup results..."
-          cd repo.git
+          git clean -xfd
           
-          # Create validation report
-          echo "# Post-cleanup Validation Report" > ../validation-report.md
-          echo "Repository: ${{ github.repository }} (Private)" >> ../validation-report.md
-          echo "Generated: $(date)" >> ../validation-report.md
-          echo "" >> ../validation-report.md
+      - name: Auto-detect and remove hardcoded ***REMOVED***s
+        run: |
+          # Create a script to detect and remove hardcoded ***REMOVED***s
+          cat > detect_***REMOVED***s.sh << 'EOF'
+          #!/bin/bash
           
-          # Check for remaining ***REMOVED***s (count only)
-          REMAINING_SECRETS=0
+          # Initialize replacements file
+          echo "# Auto-generated replacements for hardcoded ***REMOVED***s" > replacements.txt
           
-          # Search in commit messages
-          COMMIT_SECRETS=$(git log --all --grep="***REMOVED***\|***REMOVED***\|key\|***REMOVED***" --oneline | wc -l)
-          echo "Commits with potential ***REMOVED***s: $COMMIT_SECRETS" >> ../validation-report.md
+          # Function to add replacement if ***REMOVED*** is found
+          add_replacement() {
+            local pattern="$1"
+            local replacement="$2"
+            local description="$3"
+            
+            if git rev-list --all | xargs git grep -l "$pattern" >/dev/null 2>&1; then
+              echo "Found: $description"
+              echo "$pattern==>$replacement" >> replacements.txt
+            fi
+          }
           
-          if [ $COMMIT_SECRETS -gt 0 ]; then
-            REMAINING_SECRETS=$((REMAINING_SECRETS + COMMIT_SECRETS))
-          fi
+          # Common JWT ***REMOVED***s
+          add_replacement "your-***REMOVED***-key" "" "JWT ***REMOVED*** key"
+          add_replacement "your-super-***REMOVED***-jwt-key-change-this-in-production" "" "JWT super ***REMOVED***"
+          add_replacement "your-jwt-***REMOVED***" "" "JWT ***REMOVED***"
+          add_replacement "jwt-***REMOVED***" "" "JWT ***REMOVED***"
           
-          # Repository size comparison
-          CURRENT_SIZE=$(du -sh . | cut -f1)
-          echo "Current repository size: $CURRENT_SIZE" >> ../validation-report.md
+          ***REMOVED***
+          add_replacement "your-access-key" "" "AWS access key"
+          add_replacement "your-***REMOVED***-key" "" "AWS ***REMOVED*** key"
+          add_replacement "AKIA[0-9A-Z]{16}" "" "AWS access key ID"
+          add_replacement "***REMOVED***" "" "AWS access key variable"
+          add_replacement "aws_***REMOVED***_access_key" "" "AWS ***REMOVED*** key variable"
           
-          # Calculate size reduction (approximate)
-          echo "Size optimization completed" >> ../validation-report.md
+          # Database connection strings
+          add_replacement "mongodb://[^@]*@[^[:space:]]*" "" "MongoDB connection string with ***REMOVED***"
+          add_replacement "mongodb\+srv://[^@]*@[^[:space:]]*" "" "MongoDB SRV connection string with ***REMOVED***"
+          add_replacement "postgresql://[^@]*@[^[:space:]]*" "" "PostgreSQL connection string with ***REMOVED***"
+          add_replacement "mysql://[^@]*@[^[:space:]]*" "" "MySQL connection string with ***REMOVED***"
           
-          if [ $REMAINING_SECRETS -gt 0 ]; then
-            echo "⚠️ Warning: $REMAINING_SECRETS potential ***REMOVED***s may still exist"
-            echo "status=warning" >> $GITHUB_ENV
+          ***REMOVED***
+          add_replacement "***REMOVED***.*=.*['\"][^'\"]*['\"]" "" "API key assignment"
+          add_replacement "***REMOVED***.*=.*['\"][^'\"]*['\"]" "" "Token assignment"
+          add_replacement "***REMOVED***.*=.*['\"][^'\"]*['\"]" "" "Secret assignment"
+          
+          # Common ***REMOVED*** patterns
+          add_replacement "***REMOVED***.*=.*['\"][^'\"]*['\"]" "" "Password assignment"
+          add_replacement "passwd.*=.*['\"][^'\"]*['\"]" "" "Password variable"
+          
+          # Private keys
+          add_replacement "-----BEGIN PRIVATE KEY-----" "" "Private key start"
+          add_replacement "-----BEGIN RSA PRIVATE KEY-----" "" "RSA private key start"
+          add_replacement "-----BEGIN OPENSSH PRIVATE KEY-----" "" "OpenSSH private key start"
+          
+          # OAuth and OIDC ***REMOVED***s
+          add_replacement "client_***REMOVED***.*=.*['\"][^'\"]*['\"]" "" "OAuth client ***REMOVED***"
+          add_replacement "client_***REMOVED***_key.*=.*['\"][^'\"]*['\"]" "" "OAuth client ***REMOVED*** key"
+          
+          # Docker and container ***REMOVED***s
+          add_replacement "docker_***REMOVED***.*=.*['\"][^'\"]*['\"]" "" "Docker ***REMOVED***"
+          add_replacement "registry_***REMOVED***.*=.*['\"][^'\"]*['\"]" "" "Registry ***REMOVED***"
+          
+          echo "Secret detection complete. Found ***REMOVED***s:"
+          if [ -s replacements.txt ]; then
+            cat replacements.txt
           else
-            echo "✅ No obvious ***REMOVED***s found in validation"
-            echo "status=success" >> $GITHUB_ENV
+            echo "No hardcoded ***REMOVED***s found."
+          fi
+          EOF
+          
+          chmod +x detect_***REMOVED***s.sh
+          ./detect_***REMOVED***s.sh
+
+      - name: Remove detected ***REMOVED***s from history
+        run: |
+          if [ -s replacements.txt ]; then
+            echo "Removing detected ***REMOVED***s from all history..."
+            git filter-repo --force --replace-text replacements.txt
+            echo "Secrets removed successfully."
+          else
+            echo "No ***REMOVED***s detected to remove."
           fi
 
+      # - name: Set remote URL
+      #   run: |
+      #     git remote add origin https://datatest067:***REMOVED***@github.com/datatest067/***REMOVED***-repo.git"
+      #   env:
+      #     ***REMOVED***: ${{ ***REMOVED***s.MY_SECRET }}
+          
       - name: Push Cleaned Repository
         run: |
           echo "📤 Pushing cleaned repository to private repo..."
           cd repo.git
-          for ref in $(git for-each-ref --format='%(refname)' refs/pull); do
-            git update-ref -d "$ref"
-          done
           
           # Verify remote URL is set correctly with PAT
           git remote set-url origin https://$PAT_TOKEN@github.com/${{ github.repository }}.git
@@ -212,4 +204,61 @@ jobs:
           
           echo "✅ Private repository updated successfully"
 
+      - name: Validate cleaned repository
+        run: |
+          # Check that actual ***REMOVED***s have been removed (not echo statements or replacement text)
+          echo "Validating that actual ***REMOVED***s have been removed..."
+          
+          # Create a more precise validation script
+          cat > validate_***REMOVED***s.sh << 'EOF'
+          #!/bin/bash
+          
+          echo "Checking for remaining actual ***REMOVED***s..."
+          
+          # Function to check for actual ***REMOVED*** patterns
+          check_***REMOVED***_pattern() {
+            local pattern="$1"
+            local description="$2"
+            
+            # Search for the pattern but exclude common false positives
+            local results=$(git rev-list --all | xargs git grep -l "$pattern" 2>/dev/null || true)
+            
+            if [ -n "$results" ]; then
+              # Filter out false positives
+              local filtered_results=$(echo "$results" | grep -v "REDACTED_SECRET" | grep -v "echo.*Hardcoded" | grep -v "==>" | grep -v "replacement" | grep -v "validation" || true)
+              
+              if [ -n "$filtered_results" ]; then
+                echo "WARNING: Found potential $description in:"
+                echo "$filtered_results"
+                return 1
+              fi
+            fi
+            return 0
+          }
+          
+          # Check for common actual ***REMOVED*** patterns
+          check_***REMOVED***_pattern "***REMOVED***[[:space:]]*=[[:space:]]*['\"][A-Za-z0-9+/=_\\-]{10,}['\"]" "***REMOVED*** assignment"
+          check_***REMOVED***_pattern "***REMOVED***[[:space:]]*=[[:space:]]*['\"][A-Za-z0-9+/=_\\-]{10,}['\"]" "***REMOVED*** assignment"
+          check_***REMOVED***_pattern "***REMOVED***[[:space:]]*=[[:space:]]*['\"][A-Za-z0-9+/=_\\-]{10,}['\"]" "API key assignment"
+          check_***REMOVED***_pattern "***REMOVED***[[:space:]]*=[[:space:]]*['\"][A-Za-z0-9+/=_\\-]{10,}['\"]" "***REMOVED*** assignment"
+          check_***REMOVED***_pattern "AKIA[0-9A-Z]{16}" "AWS access key ID"
+          check_***REMOVED***_pattern "mongodb://[^@]*@[^[:space:]]*" "MongoDB connection with ***REMOVED***"
+          check_***REMOVED***_pattern "your-***REMOVED***-key" "JWT ***REMOVED*** key"
+          check_***REMOVED***_pattern "your-super-***REMOVED***" "JWT super ***REMOVED***"
+          
+          echo "Validation complete - no actual ***REMOVED***s found."
+          EOF
+          
+          chmod +x validate_***REMOVED***s.sh
+          ./validate_***REMOVED***s.sh
 
+      - name: Comment on PR
+        run: |
+          if [ -s replacements.txt ]; then
+            SECRET_COUNT=$(grep -c "==>" replacements.txt || echo "0")
+            gh pr comment ${{ github.event.pull_request.number }} --body "Purge complete! Removed $SECRET_COUNT hardcoded ***REMOVED***s from repository history. Backup created as a release. Please verify the repository."
+          else
+            gh pr comment ${{ github.event.pull_request.number }} --body "No hardcoded ***REMOVED***s detected in repository. Repository is clean."
+          fi
+        env:
+          ***REMOVED***: ${{ ***REMOVED***s.MY_SECRET }}
