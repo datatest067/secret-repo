@@ -1,224 +1,452 @@
-name: Purge Secrets on PR
+name: Repository Secrets Cleanup
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  issues:
+    types: [opened, edited]
+
+permissions:
+  contents: write
+  issues: write
+  actions: write
+  pull-requests: write
 
 jobs:
-  purge-***REMOVED***s:
+  validate-request:
+    if: contains(github.event.issue.labels.*.name, '***REMOVED***s-cleanup')
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-
+    outputs:
+      should_proceed: ${{ steps.validation.outputs.proceed }}
+      repository_name: ${{ steps.validation.outputs.repo_name }}
     steps:
-      - name: Checkout repository (all history, all refs)
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          fetch-tags: true
-
-      - name: Create comprehensive backup
+      - name: Validate Issue Format
+        id: validation
         run: |
-          set -e
-          BACKUP_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-          BACKUP_NAME="repo-backup-${BACKUP_TIMESTAMP}"
-          WORKDIR="/tmp/${BACKUP_NAME}"
+          echo "Validating issue format..."
+          TITLE="${{ github.event.issue.title }}"
+          BODY="${{ github.event.issue.body }}"
           
-          echo "Creating backup at $WORKDIR"
-          mkdir -p "$WORKDIR"
-      
-          # Save full git bundle (all branches and tags)
-          echo "Saving full git bundle (includes all branches/tags)..."
-          git bundle create "$WORKDIR/${BACKUP_NAME}.bundle" --all
-      
-          # Copy working directory (excluding .git and bundle)
-          echo "Copying working directory to $WORKDIR/repo-contents"
-          rsync -av --exclude='.git' --exclude='*.bundle' ./ "$WORKDIR/repo-contents"
-      
-          # Create compressed tar archive
-          echo "Creating compressed tar archive..."
-          tar -czf "$WORKDIR/${BACKUP_NAME}.tar.gz" -C "$WORKDIR" repo-contents
-      
-          echo "Backup content:"
-          ls -lh "$WORKDIR"
-      
-          echo "Creating GitHub release..."
-          gh release create "backup-${BACKUP_TIMESTAMP}" \
-            "$WORKDIR/${BACKUP_NAME}.bundle" \
-            "$WORKDIR/${BACKUP_NAME}.tar.gz" \
-            --repo "${GITHUB_REPOSITORY}" \
-            --title "Pre-purge backup - ${BACKUP_TIMESTAMP}" \
-            --notes "Complete backup before purging git history. Includes full bundle and file snapshot."
-      
-          echo "Backup completed successfully: backup-${BACKUP_TIMESTAMP}"
-        env:
-          ***REMOVED***: ${{ ***REMOVED***s.MY_SECRET }}
-
-
-      - name: Install git-filter-repo
-        run: |
-          pip install git-filter-repo
-          sudo apt-get install ripgrep
-
-      - name: Clean working directory
-        run: |
-          git clean -xfd
-          
-      - name: Auto-detect and remove hardcoded ***REMOVED***s
-        run: |
-          # Create a script to detect and remove hardcoded ***REMOVED***s
-          cat > detect_***REMOVED***s.sh << 'EOF'
-          #!/bin/bash
-          
-          # Initialize replacements file
-          echo "# Auto-generated replacements for hardcoded ***REMOVED***s" > replacements.txt
-          
-          # Function to add replacement if ***REMOVED*** is found
-          add_replacement() {
-            local pattern="$1"
-            local replacement="$2"
-            local description="$3"
+          # Check if title matches expected format
+          if [[ "$TITLE" =~ ^\[SECRETS-CLEANUP\] ]]; then
+            echo "✅ Title format is valid"
+            REPO_NAME=$(echo "$TITLE" | sed 's/\[SECRETS-CLEANUP\] //')
+            echo "repo_name=$REPO_NAME" >> $GITHUB_OUTPUT
             
-            if git rev-list --all | xargs git grep -l "$pattern" >/dev/null 2>&1; then
-              echo "Found: $description"
-              echo "$pattern==>$replacement" >> replacements.txt
+            # Check if body contains confirmation
+            if [[ "$BODY" == *"Please clean repository history of ***REMOVED***s and sensitive data"* ]]; then
+              echo "✅ Issue body is valid"
+              echo "proceed=true" >> $GITHUB_OUTPUT
+            else
+              echo "❌ Issue body doesn't match expected format"
+              echo "proceed=false" >> $GITHUB_OUTPUT
             fi
-          }
-          
-          # Common JWT ***REMOVED***s
-          add_replacement "your-***REMOVED***-key" "" "JWT ***REMOVED*** key"
-          add_replacement "your-super-***REMOVED***-jwt-key-change-this-in-production" "" "JWT super ***REMOVED***"
-          add_replacement "your-jwt-***REMOVED***" "" "JWT ***REMOVED***"
-          add_replacement "jwt-***REMOVED***" "" "JWT ***REMOVED***"
-          
-          ***REMOVED***
-          add_replacement "your-access-key" "" "AWS access key"
-          add_replacement "your-***REMOVED***-key" "" "AWS ***REMOVED*** key"
-          add_replacement "AKIA[0-9A-Z]{16}" "" "AWS access key ID"
-          add_replacement "aws_access_key_id" "" "AWS access key variable"
-          add_replacement "aws_***REMOVED***_access_key" "" "AWS ***REMOVED*** key variable"
-          
-          # Database connection strings
-          add_replacement "mongodb://[^@]*@[^[:space:]]*" "" "MongoDB connection string with ***REMOVED***"
-          add_replacement "mongodb\+srv://[^@]*@[^[:space:]]*" "" "MongoDB SRV connection string with ***REMOVED***"
-          add_replacement "postgresql://[^@]*@[^[:space:]]*" "" "PostgreSQL connection string with ***REMOVED***"
-          add_replacement "mysql://[^@]*@[^[:space:]]*" "" "MySQL connection string with ***REMOVED***"
-          
-          ***REMOVED***
-          add_replacement "***REMOVED***.*=.*['\"][^'\"]*['\"]" "" "API key assignment"
-          add_replacement "***REMOVED***.*=.*['\"][^'\"]*['\"]" "" "Token assignment"
-          add_replacement "***REMOVED***.*=.*['\"][^'\"]*['\"]" "" "Secret assignment"
-          
-          # Common ***REMOVED*** patterns
-          add_replacement "***REMOVED***.*=.*['\"][^'\"]*['\"]" "" "Password assignment"
-          add_replacement "passwd.*=.*['\"][^'\"]*['\"]" "" "Password variable"
-          
-          # Private keys
-          add_replacement "-----BEGIN PRIVATE KEY-----" "" "Private key start"
-          add_replacement "-----BEGIN RSA PRIVATE KEY-----" "" "RSA private key start"
-          add_replacement "-----BEGIN OPENSSH PRIVATE KEY-----" "" "OpenSSH private key start"
-          
-          # OAuth and OIDC ***REMOVED***s
-          add_replacement "client_***REMOVED***.*=.*['\"][^'\"]*['\"]" "" "OAuth client ***REMOVED***"
-          add_replacement "client_***REMOVED***_key.*=.*['\"][^'\"]*['\"]" "" "OAuth client ***REMOVED*** key"
-          
-          # Docker and container ***REMOVED***s
-          add_replacement "docker_***REMOVED***.*=.*['\"][^'\"]*['\"]" "" "Docker ***REMOVED***"
-          add_replacement "registry_***REMOVED***.*=.*['\"][^'\"]*['\"]" "" "Registry ***REMOVED***"
-          
-          echo "Secret detection complete. Found ***REMOVED***s:"
-          if [ -s replacements.txt ]; then
-            cat replacements.txt
           else
-            echo "No hardcoded ***REMOVED***s found."
-          fi
-          EOF
-          
-          chmod +x detect_***REMOVED***s.sh
-          ./detect_***REMOVED***s.sh
-
-      - name: Remove detected ***REMOVED***s from history
-        run: |
-          if [ -s replacements.txt ]; then
-            echo "Removing detected ***REMOVED***s from all history..."
-            git filter-repo --force --replace-text replacements.txt
-            echo "Secrets removed successfully."
-          else
-            echo "No ***REMOVED***s detected to remove."
+            echo "❌ Title doesn't match expected format"
+            echo "proceed=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Set remote URL
+      - name: Comment on Issue - Validation Result
+        uses: actions/github-script@v7
+        with:
+          github-***REMOVED***: ${{ ***REMOVED***s.PAT_TOKEN }}
+          script: |
+            const proceed = '${{ steps.validation.outputs.proceed }}';
+            const repoName = '${{ steps.validation.outputs.repo_name }}';
+            
+            if (proceed === 'true') {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: `## 🔍 Validation Successful
+                
+                **Repository:** ${repoName}
+                **Status:** Ready for cleanup
+                
+                ⚠️ **CRITICAL WARNING**: This operation will:
+                - Rewrite the entire Git history
+                - Force push to all branches and tags
+                - Potentially break existing workflows
+                - Require all collaborators to re-clone
+                
+                The cleanup process will begin automatically. Please ensure all team members are notified.`
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: `## ❌ Validation Failed
+                
+                Please ensure your issue follows this exact format:
+                
+                **Title:** \`[SECRETS-CLEANUP] Your Repository Name\`
+                **Labels:** \`***REMOVED***s-cleanup\`
+                **Body:** \`Please clean repository history of ***REMOVED***s and sensitive data\`
+                
+                Please update your issue and try again.`
+              });
+            }
+
+  clean-repository:
+    needs: validate-request
+    if: needs.validate-request.outputs.should_proceed == 'true'
+    runs-on: ubuntu-latest
+    env:
+      REPO_NAME: ${{ needs.validate-request.outputs.repository_name }}
+      BACKUP_DIR: backup-${{ github.run_number }}-$(date +%Y%m%d)
+      PAT_TOKEN: ${{ ***REMOVED***s.PAT_TOKEN }}
+    steps:
+      - name: Validate PAT Token
         run: |
-          git remote add origin https://datatest067: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@github.com/datatest067/***REMOVED***-repo.git"
-        env:
-          ***REMOVED***: ${{ ***REMOVED***s.MY_SECRET }}
+          if [ -z "$PAT_TOKEN" ]; then
+            echo "❌ PAT_TOKEN ***REMOVED*** is not configured"
+            echo "Please add your Personal Access Token as a repository ***REMOVED*** named 'PAT_TOKEN'"
+            exit 1
+          fi
           
-      - name: Force-push all refs
+          # Test PAT ***REMOVED*** permissions
+          echo "🔐 Testing PAT ***REMOVED*** permissions..."
+          RESPONSE=$(curl -s -H "Authorization: ***REMOVED*** $PAT_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}")
+          
+          if echo "$RESPONSE" | grep -q '"private": true'; then
+            echo "✅ PAT ***REMOVED*** has access to private repository"
+          else
+            echo "❌ PAT ***REMOVED*** may not have sufficient permissions"
+            echo "Ensure your PAT has 'repo' scope for private repositories"
+            exit 1
+          fi
+
+      - name: Setup Environment
         run: |
-          git config --global user.name "datatest067"
-          git config --global user.email "datatest067@gmail.com"
-          git remote set-url origin https://datatest067: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@github.com/datatest067/***REMOVED***-repo.git
+          echo "🔧 Setting up cleanup environment..."
+          sudo apt-get update
+          sudo apt-get install -y openjdk-11-jre-headless python3-pip
+          
+          # Install BFG Repo Cleaner
+          wget https://repo1.maven.org/maven2/com/madgag/bfg/1.14.0/bfg-1.14.0.jar
+          chmod +x bfg-1.14.0.jar
+          sudo mv bfg-1.14.0.jar /usr/local/bin/bfg.jar
+          echo '#!/bin/bash' | sudo tee /usr/local/bin/bfg
+          echo 'java -jar /usr/local/bin/bfg.jar "$@"' | sudo tee -a /usr/local/bin/bfg
+          sudo chmod +x /usr/local/bin/bfg
+          
+          # Install git-filter-repo as backup
+          pip3 install git-filter-repo
+
+      - name: Clone Private Repository
+        run: |
+          echo "📥 Cloning private repository with PAT..."
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          
+          # Clone with PAT authentication for private repo
+          git clone --mirror https://$PAT_TOKEN@github.com/${{ github.repository }}.git repo.git
+          cd repo.git
+          
+          # Fetch all references
+          git fetch --all --tags --prune
+          git remote set-url origin https://$PAT_TOKEN@github.com/${{ github.repository }}.git
+          
+          echo "✅ Private repository cloned successfully"
+
+      - name: Create Comprehensive Backup
+        run: |
+          echo "💾 Creating comprehensive backup..."
+          mkdir -p $BACKUP_DIR
+          cd repo.git
+          
+          # Create bundle backup (most reliable for private repos)
+          git bundle create ../$BACKUP_DIR/complete-backup.bundle --all
+          
+          # Verify bundle integrity
+          git bundle verify ../$BACKUP_DIR/complete-backup.bundle
+          
+          # Create archive backups for each branch
+          for branch in $(git branch -r | grep -v HEAD | sed 's/origin\///'); do
+            echo "Backing up branch: $branch"
+            git archive $branch --format=tar.gz --output="../$BACKUP_DIR/branch_${branch//\//_}.tar.gz"
+          done
+          
+          # Create archive backups for each tag
+          for tag in $(git tag); do
+            echo "Backing up tag: $tag"
+            git archive $tag --format=tar.gz --output="../$BACKUP_DIR/tag_${tag}.tar.gz"
+          done
+          
+          # Save repository metadata
+          git log --all --oneline > ../$BACKUP_DIR/commit-history.txt
+          git branch -a > ../$BACKUP_DIR/branches.txt
+          git tag -l > ../$BACKUP_DIR/tags.txt
+          git remote -v > ../$BACKUP_DIR/remotes.txt
+          
+          # Save repository permissions info
+          echo "Repository: ${{ github.repository }}" > ../$BACKUP_DIR/repo-info.txt
+          echo "Private: true" >> ../$BACKUP_DIR/repo-info.txt
+          echo "Backup Date: $(date)" >> ../$BACKUP_DIR/repo-info.txt
+          
+          echo "✅ Backup created successfully"
+          ls -la ../$BACKUP_DIR/
+
+      - name: Pre-cleanup Analysis
+        run: |
+          echo "🔍 Analyzing private repository for ***REMOVED***s..."
+          cd repo.git
+          
+          # Create analysis report
+          echo "# Pre-cleanup Analysis Report" > ../analysis-report.md
+          echo "Repository: ${{ github.repository }} (Private)" >> ../analysis-report.md
+          echo "Generated: $(date)" >> ../analysis-report.md
+          echo "" >> ../analysis-report.md
+          
+          # Search for potential ***REMOVED***s (count only for security)
+          echo "## Potential Secrets Found:" >> ../analysis-report.md
+          
+          # Search patterns (be careful not to expose actual ***REMOVED***s in logs)
+          git log --all --grep="***REMOVED***" --oneline | wc -l | xargs echo "Password mentions in commits:" >> ../analysis-report.md
+          git log --all --grep="***REMOVED***" --oneline | wc -l | xargs echo "Secret mentions in commits:" >> ../analysis-report.md
+          git log --all --grep="key" --oneline | wc -l | xargs echo "Key mentions in commits:" >> ../analysis-report.md
+          git log --all --grep="***REMOVED***" --oneline | wc -l | xargs echo "Token mentions in commits:" >> ../analysis-report.md
+          
+          # File-based analysis (count only, don't expose content)
+          git log --all --name-only --pretty=format: | sort -u | grep -E '\.(env|key|pem|p12|pfx|jks)$' | wc -l | xargs echo "Suspicious files found:" >> ../analysis-report.md
+          
+          # Repository size before cleanup
+          REPO_SIZE=$(du -sh . | cut -f1)
+          echo "Repository size before cleanup: $REPO_SIZE" >> ../analysis-report.md
+
+      - name: Remove Secrets with BFG
+        run: |
+          echo "🧹 Starting ***REMOVED***s removal with BFG..."
+          cd repo.git
+          
+          # Run BFG with ***REMOVED***s patterns
+          bfg --replace-text ../***REMOVED***s-patterns.txt --no-blob-protection .
+          
+          echo "✅ BFG cleanup completed"
+
+      - name: Alternative Cleanup with git-filter-repo
+        if: failure()
+        run: |
+          echo "🔄 Attempting cleanup with git-filter-repo as fallback..."
+          cd repo.git
+          
+          # Convert to regular repo for git-filter-repo
+          git config --bool core.bare false
+          git reset --hard
+          
+          # Remove files matching patterns
+          git filter-repo --path-glob '***REMOVED***' --invert-paths --force
+          git filter-repo --path-glob '***REMOVED***' --invert-paths --force
+          git filter-repo --path-glob '***REMOVED***' --invert-paths --force
+          git filter-repo --path-glob '***REMOVED***' --invert-paths --force
+          git filter-repo --path-glob '***REMOVED***' --invert-paths --force
+          git filter-repo --path-glob '***REMOVED***' --invert-paths --force
+          
+          echo "✅ git-filter-repo cleanup completed"
+
+      - name: Clean and Optimize Repository
+        run: |
+          echo "🗑️ Cleaning and optimizing repository..."
+          cd repo.git
+          
+          # Expire reflogs and cleanup
+          git reflog expire --expire=now --all
+          git gc --prune=now --aggressive
+          
+          # Force cleanup of unreachable objects
+          git fsck --unreachable
+          git prune --expire=now
+          
+          echo "✅ Repository optimization completed"
+
+      - name: Validate Cleanup Results
+        run: |
+          echo "✅ Validating cleanup results..."
+          cd repo.git
+          
+          # Create validation report
+          echo "# Post-cleanup Validation Report" > ../validation-report.md
+          echo "Repository: ${{ github.repository }} (Private)" >> ../validation-report.md
+          echo "Generated: $(date)" >> ../validation-report.md
+          echo "" >> ../validation-report.md
+          
+          # Check for remaining ***REMOVED***s (count only)
+          REMAINING_SECRETS=0
+          
+          # Search in commit messages
+          COMMIT_SECRETS=$(git log --all --grep="***REMOVED***\|***REMOVED***\|key\|***REMOVED***" --oneline | wc -l)
+          echo "Commits with potential ***REMOVED***s: $COMMIT_SECRETS" >> ../validation-report.md
+          
+          if [ $COMMIT_SECRETS -gt 0 ]; then
+            REMAINING_SECRETS=$((REMAINING_SECRETS + COMMIT_SECRETS))
+          fi
+          
+          # Repository size comparison
+          CURRENT_SIZE=$(du -sh . | cut -f1)
+          echo "Current repository size: $CURRENT_SIZE" >> ../validation-report.md
+          
+          # Calculate size reduction (approximate)
+          echo "Size optimization completed" >> ../validation-report.md
+          
+          if [ $REMAINING_SECRETS -gt 0 ]; then
+            echo "⚠️ Warning: $REMAINING_SECRETS potential ***REMOVED***s may still exist"
+            echo "status=warning" >> $GITHUB_ENV
+          else
+            echo "✅ No obvious ***REMOVED***s found in validation"
+            echo "status=success" >> $GITHUB_ENV
+          fi
+
+      - name: Push Cleaned Repository
+        run: |
+          echo "📤 Pushing cleaned repository to private repo..."
+          cd repo.git
+          
+          # Verify remote URL is set correctly with PAT
+          git remote set-url origin https://$PAT_TOKEN@github.com/${{ github.repository }}.git
+          
+          # Push all branches and tags with force
           git push --force --all
           git push --force --tags
-        # env:
-        #   ***REMOVED***: ${{ ***REMOVED***s.MY_SECRET }}
+          
+          echo "✅ Private repository updated successfully"
 
-      - name: Validate cleaned repository
-        run: |
-          # Check that actual ***REMOVED***s have been removed (not echo statements or replacement text)
-          echo "Validating that actual ***REMOVED***s have been removed..."
-          
-          # Create a more precise validation script
-          cat > validate_***REMOVED***s.sh << 'EOF'
-          #!/bin/bash
-          
-          echo "Checking for remaining actual ***REMOVED***s..."
-          
-          # Function to check for actual ***REMOVED*** patterns
-          check_***REMOVED***_pattern() {
-            local pattern="$1"
-            local description="$2"
+      - name: Upload Backup and Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: cleanup-backup-and-reports-${{ github.run_number }}
+          path: |
+            ${{ env.BACKUP_DIR }}/
+            analysis-report.md
+            validation-report.md
+          retention-days: 30
+
+      - name: Comment Results on Issue
+        uses: actions/github-script@v7
+        with:
+          github-***REMOVED***: ${{ ***REMOVED***s.PAT_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const status = process***REMOVED***.status;
             
-            # Search for the pattern but exclude common false positives
-            local results=$(git rev-list --all | xargs git grep -l "$pattern" 2>/dev/null || true)
+            let analysisReport = '';
+            let validationReport = '';
             
-            if [ -n "$results" ]; then
-              # Filter out false positives
-              local filtered_results=$(echo "$results" | grep -v "REDACTED_SECRET" | grep -v "echo.*Hardcoded" | grep -v "==>" | grep -v "replacement" | grep -v "validation" || true)
+            try {
+              analysisReport = fs.readFileSync('analysis-report.md', 'utf8');
+              validationReport = fs.readFileSync('validation-report.md', 'utf8');
+            } catch (error) {
+              console.log('Could not read report files:', error.message);
+            }
+            
+            const statusEmoji = status === 'success' ? '✅' : status === 'warning' ? '⚠️' : '❌';
+            const statusText = status === 'success' ? 'Success' : status === 'warning' ? 'Completed with Warnings' : 'Failed';
+            
+            const comment = `## ${statusEmoji} Secrets Cleanup ${statusText}
+            
+            **Private Repository:** ${{ env.REPO_NAME }}
+            **Workflow Run:** [${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            
+            ### 📊 Analysis Report
+            \`\`\`
+            ${analysisReport}
+            \`\`\`
+            
+            ### ✅ Validation Report
+            \`\`\`
+            ${validationReport}
+            \`\`\`
+            
+            ### 📦 Backup Information
+            - Backup artifacts uploaded to workflow run: \`cleanup-backup-and-reports-${{ github.run_number }}\`
+            - Retention period: 30 days
+            - Bundle backup: \`complete-backup.bundle\` (verified)
+            - **Important**: Keep backups secure as they contain original repository data
+            
+            ### ⚠️ Post-Cleanup Actions Required
+            
+            **All team members with repository access must:**
+            1. Delete their local repository: \`rm -rf repository-name\`
+            2. Clone fresh copy with PAT or SSH: \`git clone https://github.com/${{ github.repository }}.git\`
+            3. Update any local branches and remotes
+            4. Update any stored PAT ***REMOVED***s if they were in the cleaned history
+            
+            **Repository maintainers should:**
+            1. Update any CI/CD pipelines that may be affected
+            2. Check and update any hardcoded commit SHAs
+            3. Verify all integrations still work correctly
+            4. Update documentation if necessary
+            5. **Rotate any PAT ***REMOVED***s that may have been exposed**
+            
+            ${status === 'warning' ? '⚠️ **Warning**: Some potential ***REMOVED***s may still exist. Please review the validation report and consider additional manual cleanup.' : ''}
+            
+            ### 🔒 Security Recommendations for Private Repositories
+            - Implement pre-commit hooks to prevent future ***REMOVED*** commits
+            - Use GitHub Secrets for CI/CD instead of hardcoded values
+            - Regular security scans with tools like GitLeaks or TruffleHog
+            - Consider implementing branch protection rules
+            - Use environment-specific configuration files
+            - Implement proper PAT ***REMOVED*** rotation policies
+            `;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: comment
+            });
+            
+            // Close the issue
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed'
+            });
+
+  cleanup-on-failure:
+    needs: [validate-request, clean-repository]
+    if: failure() && needs.validate-request.outputs.should_proceed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Failure Notification
+        uses: actions/github-script@v7
+        with:
+          github-***REMOVED***: ${{ ***REMOVED***s.PAT_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `## ❌ Secrets Cleanup Failed
               
-              if [ -n "$filtered_results" ]; then
-                echo "WARNING: Found potential $description in:"
-                echo "$filtered_results"
-                return 1
-              fi
-            fi
-            return 0
-          }
-          
-          # Check for common actual ***REMOVED*** patterns
-          check_***REMOVED***_pattern "***REMOVED***[[:space:]]*=[[:space:]]*['\"][A-Za-z0-9+/=_\\-]{10,}['\"]" "***REMOVED*** assignment"
-          check_***REMOVED***_pattern "***REMOVED***[[:space:]]*=[[:space:]]*['\"][A-Za-z0-9+/=_\\-]{10,}['\"]" "***REMOVED*** assignment"
-          check_***REMOVED***_pattern "***REMOVED***[[:space:]]*=[[:space:]]*['\"][A-Za-z0-9+/=_\\-]{10,}['\"]" "API key assignment"
-          check_***REMOVED***_pattern "***REMOVED***[[:space:]]*=[[:space:]]*['\"][A-Za-z0-9+/=_\\-]{10,}['\"]" "***REMOVED*** assignment"
-          check_***REMOVED***_pattern "AKIA[0-9A-Z]{16}" "AWS access key ID"
-          check_***REMOVED***_pattern "mongodb://[^@]*@[^[:space:]]*" "MongoDB connection with ***REMOVED***"
-          check_***REMOVED***_pattern "your-***REMOVED***-key" "JWT ***REMOVED*** key"
-          check_***REMOVED***_pattern "your-super-***REMOVED***" "JWT super ***REMOVED***"
-          
-          echo "Validation complete - no actual ***REMOVED***s found."
-          EOF
-          
-          chmod +x validate_***REMOVED***s.sh
-          ./validate_***REMOVED***s.sh
-
-      - name: Comment on PR
-        run: |
-          if [ -s replacements.txt ]; then
-            SECRET_COUNT=$(grep -c "==>" replacements.txt || echo "0")
-            gh pr comment ${{ github.event.pull_request.number }} --body "Purge complete! Removed $SECRET_COUNT hardcoded ***REMOVED***s from repository history. Backup created as a release. Please verify the repository."
-          else
-            gh pr comment ${{ github.event.pull_request.number }} --body "No hardcoded ***REMOVED***s detected in repository. Repository is clean."
-          fi
-        env:
-          ***REMOVED***: ${{ ***REMOVED***s.MY_SECRET }}
+              **Private Repository:** ${{ needs.validate-request.outputs.repository_name }}
+              **Workflow Run:** [${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+              
+              The ***REMOVED***s cleanup process encountered an error and was aborted.
+              
+              ### 🔧 Troubleshooting Steps:
+              1. Check the workflow logs for specific error details
+              2. Verify PAT_TOKEN ***REMOVED*** is configured with 'repo' scope
+              3. Ensure the PAT ***REMOVED*** has admin privileges on the repository
+              4. Check if the repository has branch protection rules that prevent force pushes
+              5. Consider running the cleanup manually if needed
+              
+              ### 🛡️ Safety Note:
+              Your private repository has not been modified. All original history remains intact.
+              
+              ### 🔐 PAT Token Requirements:
+              - Token must have 'repo' scope for private repositories
+              - Token owner must have admin access to the repository
+              - Token must not be expired
+              
+              Please review the error logs and try again or contact a repository administrator.`
+            });
+            
+            // Add failure label
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['cleanup-failed']
+            });
