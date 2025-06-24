@@ -18,23 +18,25 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Create full repository backup
+      - name: Create comprehensive backup
         run: |
           set -e
-      
           BACKUP_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
           BACKUP_NAME="repo-backup-${BACKUP_TIMESTAMP}"
           WORKDIR="/tmp/${BACKUP_NAME}"
-      
+          
           echo "Creating backup at $WORKDIR"
           mkdir -p "$WORKDIR"
       
+          # Save full git bundle (all branches and tags)
           echo "Saving full git bundle (includes all branches/tags)..."
           git bundle create "$WORKDIR/${BACKUP_NAME}.bundle" --all
       
+          # Copy working directory (excluding .git and bundle)
           echo "Copying working directory to $WORKDIR/repo-contents"
-          rsync -av --exclude=".git" . "$WORKDIR/repo-contents" > /dev/null
+          rsync -av --exclude='.git' --exclude='*.bundle' ./ "$WORKDIR/repo-contents"
       
+          # Create compressed tar archive
           echo "Creating compressed tar archive..."
           tar -czf "$WORKDIR/${BACKUP_NAME}.tar.gz" -C "$WORKDIR" repo-contents
       
@@ -42,20 +44,17 @@ jobs:
           ls -lh "$WORKDIR"
       
           echo "Creating GitHub release..."
-          if command -v gh &> /dev/null; then
-            cd "$WORKDIR"
-            gh release create "backup-${BACKUP_TIMESTAMP}" \
-              "${BACKUP_NAME}.bundle" \
-              "${BACKUP_NAME}.tar.gz" \
-              --title "Pre-purge backup - ${BACKUP_TIMESTAMP}" \
-              --notes "Complete backup before purging git history."
-          else
-            echo "❌ GitHub CLI not available. Skipping release creation."
-          fi
+          gh release create "backup-${BACKUP_TIMESTAMP}" \
+            "$WORKDIR/${BACKUP_NAME}.bundle" \
+            "$WORKDIR/${BACKUP_NAME}.tar.gz" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "Pre-purge backup - ${BACKUP_TIMESTAMP}" \
+            --notes "Complete backup before purging git history. Includes full bundle and file snapshot."
       
-          echo "✅ Backup completed: $WORKDIR"
+          echo "Backup completed successfully: backup-${BACKUP_TIMESTAMP}"
         env:
           GITHUB_TOKEN: ${{ secrets.MY_SECRET }}
+
 
       - name: Install git-filter-repo
         run: |
