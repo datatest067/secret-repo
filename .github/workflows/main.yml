@@ -150,7 +150,7 @@ jobs:
 
       - name: Set remote URL
         run: |
-          git remote add origin "https://datatest067:${***REMOVED***}@github.com/${GITHUB_REPOSITORY}.git"
+          git remote add origin "https://datatest067:${***REMOVED***}@github.com/datatest067/***REMOVED***-repo.git"
         env:
           ***REMOVED***: ${{ ***REMOVED***s.MY_SECRET }}
 
