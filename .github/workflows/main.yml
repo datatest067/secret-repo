@@ -53,9 +53,6 @@ jobs:
 
             const body = proceed === 'true' ? `## 🔍 Validation Successful
 
-**Repository:** ${repoName}
-**Status:** Ready for cleanup
-
 ⚠️ **CRITICAL WARNING**: This operation will:
 - Rewrite the entire Git history
 - Force push to all branches and tags
