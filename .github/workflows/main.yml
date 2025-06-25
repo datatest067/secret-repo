@@ -19,292 +19,86 @@ jobs:
       PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
 
     steps:
-      - name: Checkout repository (all history, all refs)
+      - name: Checkout repo with full history
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Clone Private Repository
+      - name: Install BFG
         run: |
-          echo "📥 Cloning private repository with PAT..."
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          
-          # Clone with PAT authentication for private repo
-          git clone https://$PAT_TOKEN@github.com/${{ github.repository }}.git repo.git
-          cd repo.git
-          
-          # Fetch all references
-          git fetch --all --tags --prune
-          git remote set-url origin https://$PAT_TOKEN@github.com/${{ github.repository }}.git
-          
-          echo "✅ Private repository cloned successfully"
-
-      - name: Create Archive Backups for Remote Branches
-        run: |
-          echo "📦 Creating archive backups for all remote-tracking branches..."
-          cd repo.git
-          mkdir -p "../$BACKUP_DIR"
-      
-          # List all remote branches except HEAD and pull/refs
-          for branch in $(git branch -r | grep -vE 'HEAD|pull/'); do
-            local_branch="${branch#origin/}"
-            archive_name="branch_${local_branch//\//_}.tar.gz"
-      
-            echo "📦 Archiving $branch -> $archive_name"
-            git archive "$branch" --format=tar.gz --output="../$BACKUP_DIR/$archive_name"
-          done
-      
-          echo "✅ Branch archive backups created in $BACKUP_DIR"
-      
-      - name: Create Archive Backups for Tags
-        run: |
-          echo "🏷️ Creating archive backups for tags..."
-          cd repo.git
-      
-          for tag in $(git tag); do
-            archive_name="tag_${tag//\//_}.tar.gz"
-            echo "🏷️ Archiving tag: $tag -> $archive_name"
-            git archive "$tag" --format=tar.gz --output="../$BACKUP_DIR/$archive_name"
-          done
-      
-          echo "✅ Tag archive backups created in $BACKUP_DIR"
-
-      - name: Install git-filter-repo
-        run: |
-          echo "🔧 Setting up cleanup environment..."
-          sudo apt-get update
-          sudo apt-get install -y openjdk-11-jre-headless python3-pip
-          
-          # Install BFG Repo Cleaner
+          sudo apt-get update && sudo apt-get install -y openjdk-11-jre-headless
           wget https://repo1.maven.org/maven2/com/madgag/bfg/1.14.0/bfg-1.14.0.jar
-          chmod +x bfg-1.14.0.jar
           sudo mv bfg-1.14.0.jar /usr/local/bin/bfg.jar
-          echo '#!/bin/bash' | sudo tee /usr/local/bin/bfg
-          echo 'java -jar /usr/local/bin/bfg.jar "$@"' | sudo tee -a /usr/local/bin/bfg
+          echo -e '#!/bin/bash\njava -jar /usr/local/bin/bfg.jar "$@"' | sudo tee /usr/local/bin/bfg > /dev/null
           sudo chmod +x /usr/local/bin/bfg
-          
-          # Install git-filter-repo as backup
-          pip3 install git-filter-repo
 
-      # - name: Clean working directory
-      #   run: |
-      #     git clean -xfd
-          
-      - name: Auto-detect and remove hardcoded secrets
+      - name: Clone repo with all refs
         run: |
-          # Create a script to detect and remove hardcoded secrets
-          cat > detect_secrets.sh << 'EOF'
-          #!/bin/bash
-          
-          # Initialize replacements file
-          echo "# Auto-generated replacements for hardcoded secrets" > replacements.txt
-          
-          # Function to add replacement if secret is found
-          add_replacement() {
-            local pattern="$1"
-            local replacement="$2"
-            local description="$3"
-            
-            if git rev-list --all | xargs git grep -l "$pattern" >/dev/null 2>&1; then
-              echo "Found: $description"
-              echo "$pattern==>$replacement" >> replacements.txt
-            fi
-          }
-          
-          # Common JWT secrets
-          add_replacement "your-secret-key" "" "JWT secret key"
-          add_replacement "your-super-secret-jwt-key-change-this-in-production" "" "JWT super secret"
-          add_replacement "your-jwt-secret" "" "JWT secret"
-          add_replacement "jwt-secret" "" "JWT secret"
-          
-          # AWS credentials
-          add_replacement "your-access-key" "" "AWS access key"
-          add_replacement "your-secret-key" "" "AWS secret key"
-          add_replacement "AKIA[0-9A-Z]{16}" "" "AWS access key ID"
-          add_replacement "aws_access_key_id" "" "AWS access key variable"
-          add_replacement "aws_secret_access_key" "" "AWS secret key variable"
-          
-          # Database connection strings
-          add_replacement "***REMOVED***[^@]*@[^[:space:]]*" "" "MongoDB connection string with ***REMOVED***"
-          add_replacement "***REMOVED***\+srv://[^@]*@[^[:space:]]*" "" "MongoDB SRV connection string with ***REMOVED***"
-          add_replacement "***REMOVED***[^@]*@[^[:space:]]*" "" "PostgreSQL connection string with ***REMOVED***"
-          add_replacement "mysql://[^@]*@[^[:space:]]*" "" "MySQL connection string with ***REMOVED***"
-          
-          # API keys and tokens
-          add_replacement "api_key.*=.*['\"][^'\"]*['\"]" "" "API key assignment"
-          add_replacement "token.*=.*['\"][^'\"]*['\"]" "" "Token assignment"
-          add_replacement "secret.*=.*['\"][^'\"]*['\"]" "" "Secret assignment"
-          
-          # Common ***REMOVED*** patterns
-          add_replacement "***REMOVED***.*=.*['\"][^'\"]*['\"]" "" "Password assignment"
-          add_replacement "***REMOVED***.*=.*['\"][^'\"]*['\"]" "" "Password variable"
-          
-          # Private keys
-          add_replacement "-----BEGIN PRIVATE KEY-----" "" "Private key start"
-          add_replacement "-----BEGIN RSA PRIVATE KEY-----" "" "RSA private key start"
-          add_replacement "-----BEGIN OPENSSH PRIVATE KEY-----" "" "OpenSSH private key start"
-          
-          # OAuth and OIDC secrets
-          add_replacement "client_secret.*=.*['\"][^'\"]*['\"]" "" "OAuth client secret"
-          add_replacement "client_secret_key.*=.*['\"][^'\"]*['\"]" "" "OAuth client secret key"
-          
-          # Docker and container secrets
-          add_replacement "docker_***REMOVED***.*=.*['\"][^'\"]*['\"]" "" "Docker ***REMOVED***"
-          add_replacement "registry_***REMOVED***.*=.*['\"][^'\"]*['\"]" "" "Registry ***REMOVED***"
-          
-          echo "Secret detection complete. Found secrets:"
-          if [ -s replacements.txt ]; then
-            cat replacements.txt
-          else
-            echo "No hardcoded secrets found."
-          fi
-          EOF
-          
-          chmod +x detect_secrets.sh
-          ./detect_secrets.sh
-
-      - name: Remove detected secrets from history
-        run: |
-          if [ -s replacements.txt ]; then
-            echo "Removing detected secrets from all history..."
-            git filter-repo --force --replace-text replacements.txt
-            echo "Secrets removed successfully."
-          else
-            echo "No secrets detected to remove."
-          fi
-
-      # - name: Set remote URL
-      #   run: |
-      #     git remote add origin https://datatest067:***REMOVED***@github.com/datatest067/secret-repo.git"
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.MY_SECRET }}
-          
-      # - name: Push Cleaned Repository
-      #   run: |
-      #     echo "📤 Pushing cleaned repository to private repo..."
-      #     cd repo.git
-          
-      #     # Verify remote URL is set correctly with PAT
-      #     git remote set-url origin https://$PAT_TOKEN@github.com/${{ github.repository }}.git
-          
-      #     # Push all branches and tags with force
-      #     git push --force --all
-      #     git push --force --tags
-          
-      #     echo "✅ Private repository updated successfully"
-
-      - name: Validate cleaned repository
-        run: |
-          # Check that actual secrets have been removed (not echo statements or replacement text)
-          echo "Validating that actual secrets have been removed..."
-          
-          # Create a more precise validation script
-          cat > validate_secrets.sh << 'EOF'
-          #!/bin/bash
-          
-          echo "Checking for remaining actual secrets..."
-          
-          # Function to check for actual secret patterns
-          check_secret_pattern() {
-            local pattern="$1"
-            local description="$2"
-            
-            # Search for the pattern but exclude common false positives
-            local results=$(git rev-list --all | xargs git grep -l "$pattern" 2>/dev/null || true)
-            
-            if [ -n "$results" ]; then
-              # Filter out false positives
-              local filtered_results=$(echo "$results" | grep -v "REDACTED_SECRET" | grep -v "echo.*Hardcoded" | grep -v "==>" | grep -v "replacement" | grep -v "validation" || true)
-              
-              if [ -n "$filtered_results" ]; then
-                echo "WARNING: Found potential $description in:"
-                echo "$filtered_results"
-                return 1
-              fi
-            fi
-            return 0
-          }
-          
-          # Check for common actual secret patterns
-          check_secret_pattern "***REMOVED***[[:space:]]*=[[:space:]]*['\"][A-Za-z0-9+/=_\\-]{10,}['\"]" "***REMOVED*** assignment"
-          check_secret_pattern "token[[:space:]]*=[[:space:]]*['\"][A-Za-z0-9+/=_\\-]{10,}['\"]" "token assignment"
-          check_secret_pattern "api_key[[:space:]]*=[[:space:]]*['\"][A-Za-z0-9+/=_\\-]{10,}['\"]" "API key assignment"
-          check_secret_pattern "secret[[:space:]]*=[[:space:]]*['\"][A-Za-z0-9+/=_\\-]{10,}['\"]" "secret assignment"
-          check_secret_pattern "AKIA[0-9A-Z]{16}" "AWS access key ID"
-          check_secret_pattern "***REMOVED***[^@]*@[^[:space:]]*" "MongoDB connection with ***REMOVED***"
-          check_secret_pattern "your-secret-key" "JWT secret key"
-          check_secret_pattern "your-super-secret" "JWT super secret"
-          
-          echo "Validation complete - no actual secrets found."
-          EOF
-          
-          chmod +x validate_secrets.sh
-          ./validate_secrets.sh
-
-
-
-      - name: Prepare and Raise Pull Requests for Cleaned Branches
-        run: |
-          echo "📤 Preparing pull requests for cleaned branches..."
-          cd repo.git
-          
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
-          
-          # Convert from bare to working repo
+          git clone --mirror https://$PAT_TOKEN@github.com/${REPO_NAME}.git repo.git
+
+      - name: Convert bare repo to working
+        run: |
+          cd repo.git
           git config --bool core.bare false
           git reset --hard
           git clean -fd
-          
-          # Loop over original branches (exclude cleanup/* and HEAD)
+
+      - name: Copy secrets pattern file
+        run: |
+          cp .github/secrets-patterns.txt ./secrets-patterns.txt
+
+      - name: Clean branches & create PRs
+        run: |
+          cd repo.git
+
           for branch in $(git branch -r | grep -vE 'origin/HEAD|origin/cleanup/' | sed 's|origin/||'); do
             CLEAN_BRANCH="cleanup/${branch//\//_}"
 
-            # Clean possible overwritten workflows
-            git restore .github/workflows/main.yml || true
-            git reset --hard
-            git clean -fd
-
-
-            echo "🔧 Checking out branch: $branch"
+            echo "🔧 Checking out $branch"
             git checkout -B "$CLEAN_BRANCH" "origin/$branch"
-          
-            echo "🧹 Applying BFG cleanup..."
+
+            echo "🧹 Running BFG cleanup..."
             bfg --replace-text ../secrets-patterns.txt --no-blob-protection .
-          
+
             echo "📦 Checking for detected secrets..."
             SECRET_COUNT=$(git log -p | grep -c -f ../secrets-patterns.txt || true)
-            
+
             if [[ "$SECRET_COUNT" -eq 0 ]]; then
-              echo "ℹ️ No secrets found in $branch — skipping push & PR."
+              echo "ℹ️ No secrets found in $branch — skipping."
               continue
             fi
-            
-            echo "🧹 Finalizing cleanup with git GC"
+
+            if git diff --quiet; then
+              echo "ℹ️ No changes detected — skipping."
+              continue
+            fi
+
+            echo "🧹 Finalizing cleanup"
             git reflog expire --expire=now --all
             git gc --prune=now --aggressive
-            
-            echo "📤 Pushing cleaned branch: $CLEAN_BRANCH"
+
+            echo "📤 Pushing $CLEAN_BRANCH"
             git push origin "$CLEAN_BRANCH"
-            
-            echo "🔍 Checking if PR already exists for $CLEAN_BRANCH -> $branch"
+
+            echo "🔍 Checking for existing PR"
             PR_EXISTS=$(curl -s -H "Authorization: token $PAT_TOKEN" \
-              "https://api.github.com/repos/${REPO_NAME}/pulls?head=datatest067:${CLEAN_BRANCH}&base=${branch}" \
+              "https://api.github.com/repos/$REPO_NAME/pulls?head=datatest067:${CLEAN_BRANCH}&base=${branch}" \
               | jq '. | length')
-            
+
             if [[ "$PR_EXISTS" -gt 0 ]]; then
               echo "🚫 PR already exists for $branch — skipping."
               continue
             fi
-            
+
             echo "📬 Creating PR for $branch"
             pr_body=$(jq -n \
               --arg title "[SECRETS-CLEANUP] $branch" \
               --arg head "$CLEAN_BRANCH" \
               --arg base "$branch" \
-              --arg body "This pull request contains automated secrets cleanup for branch **$branch**.\n\nPlease review changes carefully.\n\n---\n\nGenerated by GitHub Actions." \
+              --arg body "This pull request contains automated secrets cleanup for **$branch**.\n\nPlease verify." \
               '{
                 title: $title,
                 head: $head,
@@ -312,13 +106,13 @@ jobs:
                 body: $body,
                 labels: ["security", "automated-cleanup"]
               }')
-            
+
             response=$(curl -s -w "%{http_code}" -o response.json -X POST \
               -H "Authorization: token $PAT_TOKEN" \
               -H "Accept: application/vnd.github+json" \
               https://api.github.com/repos/$REPO_NAME/pulls \
               -d "$pr_body")
-            
+
             if [[ "$response" != "201" ]]; then
               echo "❌ Failed to create PR for $branch (HTTP $response)"
               cat response.json
@@ -326,26 +120,8 @@ jobs:
             else
               echo "✅ PR created for $branch"
             fi
-          
-            echo "🧼 Cleaning repo before next iteration"
+
             git reset --hard
             git clean -fd
-          
+
           done
-          # env:
-          #   PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
-          #   REPO_NAME: datatest067/secret-repo
-
-
-
-      # - name: Comment on PR
-      #   run: |
-      #     cd repo.git  # ensure you're inside the git repo
-      #     if [ -s replacements.txt ]; then
-      #       SECRET_COUNT=$(grep -c "==>" replacements.txt || echo "0")
-      #       gh pr comment ${{ github.event.pull_request.number }} --body "Purge complete! Removed $SECRET_COUNT hardcoded secrets from repository history. Backup created as a release. Please verify the repository."
-      #     else
-      #       gh pr comment ${{ github.event.pull_request.number }} --body "No hardcoded secrets detected in repository. Repository is clean."
-      #     fi
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.MY_SECRET }}
