@@ -37,11 +37,24 @@ jobs:
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
-          git clone --mirror https://$PAT_TOKEN@github.com/${REPO_NAME}.git repo.git
+          git clone https://$PAT_TOKEN@github.com/${REPO_NAME}.git repo.git
+          cd repo.git
+          
+          # Fetch all references
+          git fetch --all --tags --prune
+          git remote set-url origin https://$PAT_TOKEN@github.com/${{ github.repository }}.git
+          
+          echo "✅ Private repository cloned successfully"
 
       - name: Convert bare repo to working
         run: |
+          echo "📤 Preparing pull requests for cleaned branches..."
           cd repo.git
+          
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          
+          # Convert from bare to working repo
           git config --bool core.bare false
           git reset --hard
           git clean -fd
