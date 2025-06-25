@@ -25,14 +25,6 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Install BFG
-        run: |
-          sudo apt-get update && sudo apt-get install -y openjdk-11-jre-headless
-          wget https://repo1.maven.org/maven2/com/madgag/bfg/1.14.0/bfg-1.14.0.jar
-          sudo mv bfg-1.14.0.jar /usr/local/bin/bfg.jar
-          echo -e '#!/bin/bash\njava -jar /usr/local/bin/bfg.jar "$@"' | sudo tee /usr/local/bin/bfg > /dev/null
-          sudo chmod +x /usr/local/bin/bfg
-
       - name: Clone repo with all refs
         run: |
           git config --global user.name "GitHub Actions"
@@ -59,6 +51,54 @@ jobs:
           git reset --hard
           git clean -fd
 
+
+      - name: Create Archive Backups for Remote Branches
+        run: |
+          echo "📦 Creating archive backups for all remote-tracking branches..."
+          cd repo.git
+          mkdir -p "../$BACKUP_DIR"
+      
+          # List all remote branches except HEAD and pull/refs
+          for branch in $(git branch -r | grep -vE 'HEAD|pull/'); do
+            local_branch="${branch#origin/}"
+            archive_name="branch_${local_branch//\//_}.tar.gz"
+      
+            echo "📦 Archiving $branch -> $archive_name"
+            git archive "$branch" --format=tar.gz --output="../$BACKUP_DIR/$archive_name"
+          done
+      
+          echo "✅ Branch archive backups created in $BACKUP_DIR"
+      
+      - name: Create Archive Backups for Tags
+        run: |
+          echo "🏷️ Creating archive backups for tags..."
+          cd repo.git
+      
+          for tag in $(git tag); do
+            archive_name="tag_${tag//\//_}.tar.gz"
+            echo "🏷️ Archiving tag: $tag -> $archive_name"
+            git archive "$tag" --format=tar.gz --output="../$BACKUP_DIR/$archive_name"
+          done
+      
+          echo "✅ Tag archive backups created in $BACKUP_DIR"
+
+      - name: Install git-filter-repo
+        run: |
+          echo "🔧 Setting up cleanup environment..."
+          sudo apt-get update
+          sudo apt-get install -y openjdk-11-jre-headless python3-pip
+          
+          # Install BFG Repo Cleaner
+          wget https://repo1.maven.org/maven2/com/madgag/bfg/1.14.0/bfg-1.14.0.jar
+          chmod +x bfg-1.14.0.jar
+          sudo mv bfg-1.14.0.jar /usr/local/bin/bfg.jar
+          echo '#!/bin/bash' | sudo tee /usr/local/bin/bfg
+          echo 'java -jar /usr/local/bin/bfg.jar "$@"' | sudo tee -a /usr/local/bin/bfg
+          sudo chmod +x /usr/local/bin/bfg
+          
+          # Install git-filter-repo as backup
+          pip3 install git-filter-repo
+
       - name: Copy secrets pattern file
         run: |
           cp .github/secrets-patterns.txt ./secrets-patterns.txt
@@ -74,7 +114,7 @@ jobs:
             git checkout -B "$CLEAN_BRANCH" "origin/$branch"
 
             echo "🧹 Running BFG cleanup..."
-            bfg --replace-text ../secrets-patterns.txt --no-blob-protection .
+            bfg --replace-text ./secrets-patterns.txt --no-blob-protection .
 
             echo "📦 Checking for detected secrets..."
             SECRET_COUNT=$(git log -p | grep -c -f ../secrets-patterns.txt || true)
