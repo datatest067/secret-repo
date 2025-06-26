@@ -15,131 +15,97 @@ jobs:
     runs-on: ubuntu-latest
     env:
       REPO_NAME: ${{ github.repository }}
-      BACKUP_DIR: backup-$REPO_NAME
+      BACKUP_DIR: backup-${{ github.repository }}
       PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
 
     steps:
-      - name: Checkout repo with full history
+      - name: Checkout repository (all history, all refs)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Clone repo with all refs
+      - name: Clone Private Repository
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
-          git clone https://$PAT_TOKEN@github.com/${REPO_NAME}.git repo.git
+          git clone https://$PAT_TOKEN@github.com/${{ github.repository }}.git repo.git
           cd repo.git
-          
-          # Fetch all references
           git fetch --all --tags --prune
           git remote set-url origin https://$PAT_TOKEN@github.com/${{ github.repository }}.git
-          
-          echo "✅ Private repository cloned successfully"
 
-      - name: Convert bare repo to working
+      - name: Install tools
         run: |
-          echo "📤 Preparing pull requests for cleaned branches..."
+          sudo apt-get update
+          sudo apt-get install -y openjdk-11-jre-headless jq
+          wget https://repo1.maven.org/maven2/com/madgag/bfg/1.14.0/bfg-1.14.0.jar
+          chmod +x bfg-1.14.0.jar && sudo mv bfg-1.14.0.jar /usr/local/bin/bfg.jar
+          echo '#!/bin/bash' | sudo tee /usr/local/bin/bfg
+          echo 'java -jar /usr/local/bin/bfg.jar "$@"' | sudo tee -a /usr/local/bin/bfg
+          sudo chmod +x /usr/local/bin/bfg
+
+      - name: Check for existing GitHub secret scanning alerts
+        run: |
+          echo "🔍 Fetching existing secret scanning alerts from GitHub..."
+
+          curl -s -H "Authorization: token $PAT_TOKEN" \
+               -H "Accept: application/vnd.github+json" \
+               "https://api.github.com/repos/${REPO_NAME}/secret-scanning/alerts" > alerts.json
+
+          COUNT=$(jq '. | length' alerts.json)
+
+          if [[ "$COUNT" -gt 0 ]]; then
+            echo "🚨 Found $COUNT existing secret scanning alerts!"
+            jq '.[] | {secret_type, state, location}' alerts.json | tee ../secret.txt
+            cat ../secret.txt
+          else
+            echo "✅ No existing secret scanning alerts found."
+            echo "No secrets detected via GitHub secret scanning API." > ../secret.txt
+          fi
+
+      - name: Use patterns from file and purge
+        run: |
           cd repo.git
-          
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          
-          # Convert from bare to working repo
           git config --bool core.bare false
           git reset --hard
           git clean -fd
 
-
-      - name: Create Archive Backups for Remote Branches
-        run: |
-          echo "📦 Creating archive backups for all remote-tracking branches..."
-          cd repo.git
-          mkdir -p "../$BACKUP_DIR"
-      
-          # List all remote branches except HEAD and pull/refs
-          for branch in $(git branch -r | grep -vE 'HEAD|pull/'); do
-            local_branch="${branch#origin/}"
-            archive_name="branch_${local_branch//\//_}.tar.gz"
-      
-            echo "📦 Archiving $branch -> $archive_name"
-            git archive "$branch" --format=tar.gz --output="../$BACKUP_DIR/$archive_name"
-          done
-      
-          echo "✅ Branch archive backups created in $BACKUP_DIR"
-      
-      - name: Create Archive Backups for Tags
-        run: |
-          echo "🏷️ Creating archive backups for tags..."
-          cd repo.git
-      
-          for tag in $(git tag); do
-            archive_name="tag_${tag//\//_}.tar.gz"
-            echo "🏷️ Archiving tag: $tag -> $archive_name"
-            git archive "$tag" --format=tar.gz --output="../$BACKUP_DIR/$archive_name"
-          done
-      
-          echo "✅ Tag archive backups created in $BACKUP_DIR"
-
-      - name: Install git-filter-repo
-        run: |
-          echo "🔧 Setting up cleanup environment..."
-          sudo apt-get update
-          sudo apt-get install -y openjdk-11-jre-headless python3-pip
-          
-          # Install BFG Repo Cleaner
-          wget https://repo1.maven.org/maven2/com/madgag/bfg/1.14.0/bfg-1.14.0.jar
-          chmod +x bfg-1.14.0.jar
-          sudo mv bfg-1.14.0.jar /usr/local/bin/bfg.jar
-          echo '#!/bin/bash' | sudo tee /usr/local/bin/bfg
-          echo 'java -jar /usr/local/bin/bfg.jar "$@"' | sudo tee -a /usr/local/bin/bfg
-          sudo chmod +x /usr/local/bin/bfg
-          
-          # Install git-filter-repo as backup
-          pip3 install git-filter-repo
-
-      - name: Copy secrets pattern file
-        run: |
-          cp .github/secrets-patterns.txt ./secrets-patterns.txt
-
-      - name: Clean branches & create PRs
-        run: |
-          cd repo.git
-
           for branch in $(git branch -r | grep -vE 'origin/HEAD|origin/cleanup/' | sed 's|origin/||'); do
             CLEAN_BRANCH="cleanup/${branch//\//_}"
 
-            echo "🔧 Checking out $branch"
+            git restore .github/workflows/main.yml || true
+            git reset --hard
+            git clean -fd
+
+            echo "🔧 Checking out branch: $branch"
             git checkout -B "$CLEAN_BRANCH" "origin/$branch"
 
-            echo "🧹 Running BFG cleanup..."
-            bfg --replace-text ./secrets-patterns.txt --no-blob-protection .
+            echo "🧹 Running BFG with external patterns"
+            bfg --replace-text ../secrets-patterns.txt --no-blob-protection .
 
             echo "📦 Checking for detected secrets..."
             SECRET_COUNT=$(git log -p | grep -c -f ../secrets-patterns.txt || true)
 
             if [[ "$SECRET_COUNT" -eq 0 ]]; then
-              echo "ℹ️ No secrets found in $branch — skipping."
+              echo "ℹ️ No secrets found in $branch — skipping push & PR."
               continue
             fi
 
             if git diff --quiet; then
-              echo "ℹ️ No changes detected — skipping."
+              echo "ℹ️ No changes detected after cleanup — skipping push & PR."
               continue
             fi
 
-            echo "🧹 Finalizing cleanup"
+            echo "🧹 Finalizing cleanup with git GC"
             git reflog expire --expire=now --all
             git gc --prune=now --aggressive
 
-            echo "📤 Pushing $CLEAN_BRANCH"
+            echo "📤 Pushing cleaned branch: $CLEAN_BRANCH"
             git push origin "$CLEAN_BRANCH"
 
-            echo "🔍 Checking for existing PR"
+            echo "🔍 Checking if PR already exists"
             PR_EXISTS=$(curl -s -H "Authorization: token $PAT_TOKEN" \
-              "https://api.github.com/repos/$REPO_NAME/pulls?head=datatest067:${CLEAN_BRANCH}&base=${branch}" \
-              | jq '. | length')
+              "https://api.github.com/repos/${REPO_NAME}/pulls?head=datatest067:${CLEAN_BRANCH}&base=${branch}" | jq '. | length')
 
             if [[ "$PR_EXISTS" -gt 0 ]]; then
               echo "🚫 PR already exists for $branch — skipping."
@@ -151,14 +117,8 @@ jobs:
               --arg title "[SECRETS-CLEANUP] $branch" \
               --arg head "$CLEAN_BRANCH" \
               --arg base "$branch" \
-              --arg body "This pull request contains automated secrets cleanup for **$branch**.\n\nPlease verify." \
-              '{
-                title: $title,
-                head: $head,
-                base: $base,
-                body: $body,
-                labels: ["security", "automated-cleanup"]
-              }')
+              --arg body "This pull request contains automated secrets cleanup for branch **$branch**.\n\nPlease review changes carefully.\n\n---\n\nGenerated by GitHub Actions." \
+              '{title: $title, head: $head, base: $base, body: $body, labels: ["security", "automated-cleanup"]}')
 
             response=$(curl -s -w "%{http_code}" -o response.json -X POST \
               -H "Authorization: token $PAT_TOKEN" \
@@ -174,7 +134,7 @@ jobs:
               echo "✅ PR created for $branch"
             fi
 
+            echo "🧼 Cleaning repo before next iteration"
             git reset --hard
             git clean -fd
-
           done
