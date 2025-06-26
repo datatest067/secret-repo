@@ -52,15 +52,19 @@ jobs:
                -H "Accept: application/vnd.github+json" \
                "https://api.github.com/repos/${REPO_NAME}/***REMOVED***-scanning/alerts" > alerts.json
 
-          COUNT=$(jq '. | length' alerts.json)
-
-          if [[ "$COUNT" -gt 0 ]]; then
-            echo "🚨 Found $COUNT existing ***REMOVED*** scanning alerts!"
-            jq '.[] | {***REMOVED***_type, state, location}' alerts.json | tee ../***REMOVED***.txt
-            cat ../***REMOVED***.txt
+          if jq -e 'type == "array"' alerts.json > /dev/null; then
+            COUNT=$(jq '. | length' alerts.json)
+            if [[ "$COUNT" -gt 0 ]]; then
+              echo "🚨 Found $COUNT existing ***REMOVED*** scanning alerts!"
+              jq '.[] | {***REMOVED***_type, state, location}' alerts.json | tee ../***REMOVED***.txt
+            else
+              echo "✅ No existing ***REMOVED*** scanning alerts found."
+              echo "No ***REMOVED***s detected via GitHub ***REMOVED*** scanning API." > ../***REMOVED***.txt
+            fi
           else
-            echo "✅ No existing ***REMOVED*** scanning alerts found."
-            echo "No ***REMOVED***s detected via GitHub ***REMOVED*** scanning API." > ../***REMOVED***.txt
+            echo "⚠️ Unexpected response from GitHub API:"
+            cat alerts.json
+            echo "No valid ***REMOVED*** scanning alerts found." > ../***REMOVED***.txt
           fi
 
       - name: Use patterns from file and purge
