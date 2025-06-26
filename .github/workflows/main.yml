@@ -52,15 +52,19 @@ jobs:
                -H "Accept: application/vnd.github+json" \
                "https://api.github.com/repos/${REPO_NAME}/secret-scanning/alerts" > alerts.json
 
-          COUNT=$(jq '. | length' alerts.json)
-
-          if [[ "$COUNT" -gt 0 ]]; then
-            echo "🚨 Found $COUNT existing secret scanning alerts!"
-            jq '.[] | {secret_type, state, location}' alerts.json | tee ../secret.txt
-            cat ../secret.txt
+          if jq -e 'type == "array"' alerts.json > /dev/null; then
+            COUNT=$(jq '. | length' alerts.json)
+            if [[ "$COUNT" -gt 0 ]]; then
+              echo "🚨 Found $COUNT existing secret scanning alerts!"
+              jq '.[] | {secret_type, state, location}' alerts.json | tee ../secret.txt
+            else
+              echo "✅ No existing secret scanning alerts found."
+              echo "No secrets detected via GitHub secret scanning API." > ../secret.txt
+            fi
           else
-            echo "✅ No existing secret scanning alerts found."
-            echo "No secrets detected via GitHub secret scanning API." > ../secret.txt
+            echo "⚠️ Unexpected response from GitHub API:"
+            cat alerts.json
+            echo "No valid secret scanning alerts found." > ../secret.txt
           fi
 
       - name: Use patterns from file and purge
