@@ -109,18 +109,28 @@ jobs:
       #     git clean -xfd
           
 
-      # Step 4: Detect secrets using GitHub REST API
       - name: Detect secrets using GitHub REST API
-        # env:
-        #   GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           echo "🏷️ Creating Secret File..."
           cd repo.git
+      
           echo "Fetching secret scanning alerts..."
-          curl -H "Authorization: token $PAT_TOKEN" \
-          -H "Accept: application/vnd.github.v3+json" \
-          "https://api.github.com/repos/${{ github.repository }}/secret-scanning/alerts" > secrets.json
-          echo "Secrets fetched and saved to secrets.json"
+          curl -s -w "%{http_code}" -o secrets.json \
+            -H "Authorization: token $PAT_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/secret-scanning/alerts" > curl_output.txt
+      
+          STATUS=$(tail -n1 curl_output.txt)
+          mv curl_output.txt tmp.json && head -n -1 tmp.json > secrets.json && rm tmp.json
+      
+          if [[ "$STATUS" != "200" ]]; then
+            echo "❌ GitHub API call failed with status $STATUS"
+            cat secrets.json
+            echo "[]" > secrets.json
+          else
+            echo "✅ Secrets fetched successfully"
+          fi
+
 
       - name: Dump secrets to secrets.txt
         run: |
@@ -140,6 +150,7 @@ jobs:
             cat secrets.json
             echo "Invalid secret scanning data" > secrets.txt
           fi
+
 
       # Step 7: Purge secrets using BFG Repo-Cleaner
       - name: Purge secrets using BFG Repo-Cleaner
