@@ -236,12 +236,6 @@ jobs:
           git fsck
           echo "Repository validated"
 
-      # - name: Upload ***REMOVED*** dump artifact
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: found-***REMOVED***s
-      #     path: ***REMOVED***s.txt
-
       - name: Prepare and Raise Pull Requests for Cleaned Branches
         run: |
           echo "📤 Preparing pull requests for cleaned branches..."
@@ -284,7 +278,7 @@ jobs:
             git gc --prune=now --aggressive
             
             echo "📤 Pushing cleaned branch: $CLEAN_BRANCH"
-            git push origin "$CLEAN_BRANCH"
+            git push --force origin "$CLEAN_BRANCH"
             
             echo "🔍 Checking if PR already exists for $CLEAN_BRANCH -> $branch"
             PR_EXISTS=$(curl -s -H "Authorization: ***REMOVED*** $PAT_TOKEN" \
@@ -329,6 +323,4 @@ jobs:
             git clean -fd
           
           done
-          # env:
-          #   PAT_TOKEN: ${{ ***REMOVED***s.PAT_TOKEN }}
-          #   REPO_NAME: datatest067/***REMOVED***-repo
+
