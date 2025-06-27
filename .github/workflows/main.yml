@@ -114,6 +114,8 @@ jobs:
         # env:
         #   ***REMOVED***: ${{ ***REMOVED***s.PAT_TOKEN }}
         run: |
+          echo "🏷️ Creating Secret File..."
+          cd repo.git
           echo "Fetching ***REMOVED*** scanning alerts..."
           curl -H "Authorization: ***REMOVED*** $PAT_TOKEN" \
           -H "Accept: application/vnd.github.v3+json" \
@@ -123,6 +125,7 @@ jobs:
       # Step 5: Dump ***REMOVED***s to ***REMOVED***s.txt
       - name: Dump ***REMOVED***s to ***REMOVED***s.txt
         run: |
+          cd repo.git
           jq -r '.[] | .***REMOVED***' ***REMOVED***s.json > ***REMOVED***s.txt
           echo "Secrets dumped to ***REMOVED***s.txt"
 
