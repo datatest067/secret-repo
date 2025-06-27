@@ -13,14 +13,8 @@ function extractField(label) {
 }
 
 const fields = [
-  "ADO Organization Name",
-  "ADO Project Name",
-  "ADO Repository Name",
   "GitHub Organization Name",
   "GitHub Repository Name",
-  "Requested By",
-  "Are there any pipelines?",
-  "Additional Notes"
 ];
 
 const data = fields.map(f => extractField(f)).join(',');
