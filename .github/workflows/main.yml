@@ -1,4 +1,4 @@
-name: Purge Secrets on PR
+name: Secret Removal on Form Submission
 
 on:
   issues:
@@ -20,6 +20,58 @@ jobs:
       PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
 
     steps:
+      - name: Parse form inputs from issue body
+        id: parse
+        run: |
+          echo "🔍 Raw ISSUE_BODY:"
+          echo "${{ github.event.issue.body }}"
+          echo "------------------------------"
+
+          ISSUE_BODY="${{ github.event.issue.body }}"
+
+          # Helper function to extract value under a markdown header
+          parse_field() {
+            echo "$ISSUE_BODY" | awk -v field="### $1" '
+              {
+                gsub(/^[ \t\r\n]+|[ \t\r\n]+$/, "", $0)  # trim whitespace
+              }
+              $0 == field {
+                while (getline) {
+                  gsub(/^[ \t\r\n]+|[ \t\r\n]+$/, "", $0)
+                  if (length($0) > 0) {
+                    print $0
+                    exit
+                  }
+                }
+              }
+            '
+          }
+
+          GH_REPO=$(parse_field "Target GitHub Repo Name")
+          GH_ORG=$(parse_field "Target GitHub Org Name")
+          INCLUDE_PIPELINES=$(parse_field "Secret Removal Pipelines?")
+
+          echo "✅ Parsed Values:"
+          echo "GH_REPO=$GH_REPO"
+          echo "GH_ORG=$GH_ORG"
+          echo "INCLUDE_PIPELINES=$INCLUDE_PIPELINES"
+
+          echo "gh_repo=$GH_REPO" >> $GITHUB_OUTPUT
+          echo "gh_org"=$GH_ORG >> $GITHUB_OUTPUT
+          echo "include_pipelines=$INCLUDE_PIPELINES" >> $GITHUB_OUTPUT
+
+      - name: Debug parsed outputs
+        run: |
+          echo "GH Repo: ${{ steps.parse.outputs.gh_repo }}"
+          echo "GH Org: ${{ steps.prase.outputs.gh_org}}"
+          echo "Include Pipelines: ${{ steps.parse.outputs.include_pipelines }}"
+
+      - name: Exit if not approved for Secret Removal
+        if: ${{ steps.parse.outputs.include_pipelines != 'Yes' }}
+        run: |
+          echo "Pipeline migration not approved. Exiting..."
+          exit 0
+    
       - name: Checkout repository (all history, all refs)
         uses: actions/checkout@v4
         with:
@@ -75,18 +127,18 @@ jobs:
           echo "✅ Tag archive backups created in $BACKUP_DIR"
 
       # # Step 3: Upload the branch backup as an artifact
-      # - name: Upload branch backup
-      #   uses: actions/upload-artifact@v2
-      #   with:
-      #     name: branch-backup
-      #     path: branch.zip
+      - name: Upload branch backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: branch-backup
+          path: branch.zip
         
       # # Step 3: Upload the tag backup as an artifact
-      # - name: Upload tag backup
-      #   uses: actions/upload-artifact@v2
-      #   with:
-      #     name: tag-backup
-      #     path: tag.zip
+      - name: Upload tag backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: tag-backup
+          path: tag.zip
 
       - name: Install git-filter-repo
         run: |
@@ -104,11 +156,6 @@ jobs:
           
           # Install git-filter-repo as backup
           pip3 install git-filter-repo
-
-      # - name: Clean working directory
-      #   run: |
-      #     git clean -xfd
-          
 
       - name: Detect secrets using GitHub REST API
         run: |
@@ -174,6 +221,12 @@ jobs:
           echo "Validating the cleaned repository..."
           git fsck
           echo "Repository validated"
+
+      # - name: Upload secret dump artifact
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: found-secrets
+      #     path: secrets.txt
 
       - name: Prepare and Raise Pull Requests for Cleaned Branches
         run: |
