@@ -122,12 +122,24 @@ jobs:
           "https://api.github.com/repos/${{ github.repository }}/***REMOVED***-scanning/alerts" > ***REMOVED***s.json
           echo "Secrets fetched and saved to ***REMOVED***s.json"
 
-      # Step 5: Dump ***REMOVED***s to ***REMOVED***s.txt
       - name: Dump ***REMOVED***s to ***REMOVED***s.txt
         run: |
           cd repo.git
-          jq -r '.[] | .***REMOVED***' ***REMOVED***s.json > ***REMOVED***s.txt
-          echo "Secrets dumped to ***REMOVED***s.txt"
+      
+          if jq -e 'type == "array"' ***REMOVED***s.json > /dev/null; then
+            COUNT=$(jq '. | length' ***REMOVED***s.json)
+            if [[ "$COUNT" -gt 0 ]]; then
+              jq -r '.[] | .***REMOVED***' ***REMOVED***s.json > ***REMOVED***s.txt
+              echo "✅ $COUNT ***REMOVED***s dumped to ***REMOVED***s.txt"
+            else
+              echo "✅ No ***REMOVED***s found. Writing empty file."
+              echo "No ***REMOVED***s found" > ***REMOVED***s.txt
+            fi
+          else
+            echo "⚠️ Unexpected response in ***REMOVED***s.json:"
+            cat ***REMOVED***s.json
+            echo "Invalid ***REMOVED*** scanning data" > ***REMOVED***s.txt
+          fi
 
       # Step 7: Purge ***REMOVED***s using BFG Repo-Cleaner
       - name: Purge ***REMOVED***s using BFG Repo-Cleaner
