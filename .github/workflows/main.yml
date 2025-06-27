@@ -1,8 +1,8 @@
 name: Purge Secrets on PR
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  issues:
+    types: [opened]
 
 permissions:
   contents: write
@@ -11,7 +11,8 @@ permissions:
   pull-requests: write
 
 jobs:
-  purge-secrets:
+  Secret_Removal:
+    if: startsWith(github.event.issue.title, '[Secret-Removal]')
     runs-on: ubuntu-latest
     env:
       REPO_NAME: ${{ github.repository }}
