@@ -73,19 +73,19 @@ jobs:
       
           echo "✅ Tag archive backups created in $BACKUP_DIR"
 
-      # Step 3: Upload the branch backup as an artifact
-      - name: Upload branch backup
-        uses: actions/upload-artifact@v2
-        with:
-          name: branch-backup
-          path: branch.zip
+      # # Step 3: Upload the branch backup as an artifact
+      # - name: Upload branch backup
+      #   uses: actions/upload-artifact@v2
+      #   with:
+      #     name: branch-backup
+      #     path: branch.zip
         
-      # Step 3: Upload the tag backup as an artifact
-      - name: Upload tag backup
-        uses: actions/upload-artifact@v2
-        with:
-          name: tag-backup
-          path: tag.zip
+      # # Step 3: Upload the tag backup as an artifact
+      # - name: Upload tag backup
+      #   uses: actions/upload-artifact@v2
+      #   with:
+      #     name: tag-backup
+      #     path: tag.zip
 
       - name: Install git-filter-repo
         run: |
