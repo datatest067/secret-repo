@@ -109,18 +109,28 @@ jobs:
       #     git clean -xfd
           
 
-      # Step 4: Detect ***REMOVED***s using GitHub REST API
       - name: Detect ***REMOVED***s using GitHub REST API
-        # env:
-        #   ***REMOVED***: ${{ ***REMOVED***s.PAT_TOKEN }}
         run: |
           echo "🏷️ Creating Secret File..."
           cd repo.git
+      
           echo "Fetching ***REMOVED*** scanning alerts..."
-          curl -H "Authorization: ***REMOVED*** $PAT_TOKEN" \
-          -H "Accept: application/vnd.github.v3+json" \
-          "https://api.github.com/repos/${{ github.repository }}/***REMOVED***-scanning/alerts" > ***REMOVED***s.json
-          echo "Secrets fetched and saved to ***REMOVED***s.json"
+          curl -s -w "%{http_code}" -o ***REMOVED***s.json \
+            -H "Authorization: ***REMOVED*** $PAT_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/***REMOVED***-scanning/alerts" > curl_output.txt
+      
+          STATUS=$(tail -n1 curl_output.txt)
+          mv curl_output.txt tmp.json && head -n -1 tmp.json > ***REMOVED***s.json && rm tmp.json
+      
+          if [[ "$STATUS" != "200" ]]; then
+            echo "❌ GitHub API call failed with status $STATUS"
+            cat ***REMOVED***s.json
+            echo "[]" > ***REMOVED***s.json
+          else
+            echo "✅ Secrets fetched successfully"
+          fi
+
 
       - name: Dump ***REMOVED***s to ***REMOVED***s.txt
         run: |
@@ -140,6 +150,7 @@ jobs:
             cat ***REMOVED***s.json
             echo "Invalid ***REMOVED*** scanning data" > ***REMOVED***s.txt
           fi
+
 
       # Step 7: Purge ***REMOVED***s using BFG Repo-Cleaner
       - name: Purge ***REMOVED***s using BFG Repo-Cleaner
