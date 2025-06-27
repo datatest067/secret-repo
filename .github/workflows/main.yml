@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       REPO_NAME: ${{ github.repository }}
-      BACKUP_DIR: backup-${{ github.repository }}
+      BACKUP_DIR: backup-$REPO_NAME
       PAT_TOKEN: ${{ ***REMOVED***s.PAT_TOKEN }}
 
     steps:
@@ -27,109 +27,202 @@ jobs:
 
       - name: Clone Private Repository
         run: |
+          echo "📥 Cloning private repository with PAT..."
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
+          
+          # Clone with PAT authentication for private repo
           git clone https://$PAT_TOKEN@github.com/${{ github.repository }}.git repo.git
           cd repo.git
+          
+          # Fetch all references
           git fetch --all --tags --prune
           git remote set-url origin https://$PAT_TOKEN@github.com/${{ github.repository }}.git
+          
+          echo "✅ Private repository cloned successfully"
 
-      - name: Install tools
+      - name: Create Archive Backups for Remote Branches
         run: |
+          echo "📦 Creating archive backups for all remote-tracking branches..."
+          cd repo.git
+          mkdir -p "../$BACKUP_DIR"
+      
+          # List all remote branches except HEAD and pull/refs
+          for branch in $(git branch -r | grep -vE 'HEAD|pull/'); do
+            local_branch="${branch#origin/}"
+            archive_name="branch_${local_branch//\//_}.tar"
+      
+            echo "📦 Archiving $branch -> $archive_name"
+            git archive "$branch" --format=tar --output="../$BACKUP_DIR/$archive_name"
+            zip branch.zip ../$BACKUP_DIR/$archive_name
+          done
+      
+          echo "✅ Branch archive backups created in $BACKUP_DIR"
+      
+      - name: Create Archive Backups for Tags
+        run: |
+          echo "🏷️ Creating archive backups for tags..."
+          cd repo.git
+      
+          for tag in $(git tag); do
+            archive_name="tag_${tag//\//_}.tar"
+            echo "🏷️ Archiving tag: $tag -> $archive_name"
+            git archive "$tag" --format=tar --output="../$BACKUP_DIR/$archive_name"
+            zip tag.zip ../$BACKUP_DIR/$archive_name
+          done
+      
+          echo "✅ Tag archive backups created in $BACKUP_DIR"
+
+      # Step 3: Upload the branch backup as an artifact
+      - name: Upload branch backup
+        uses: actions/upload-artifact@v2
+        with:
+          name: branch-backup
+          path: branch.zip
+        
+      # Step 3: Upload the tag backup as an artifact
+      - name: Upload tag backup
+        uses: actions/upload-artifact@v2
+        with:
+          name: tag-backup
+          path: tag.zip
+
+      - name: Install git-filter-repo
+        run: |
+          echo "🔧 Setting up cleanup environment..."
           sudo apt-get update
-          sudo apt-get install -y openjdk-11-jre-headless jq
+          sudo apt-get install -y openjdk-11-jre-headless python3-pip
+          
+          # Install BFG Repo Cleaner
           wget https://repo1.maven.org/maven2/com/madgag/bfg/1.14.0/bfg-1.14.0.jar
-          chmod +x bfg-1.14.0.jar && sudo mv bfg-1.14.0.jar /usr/local/bin/bfg.jar
+          chmod +x bfg-1.14.0.jar
+          sudo mv bfg-1.14.0.jar /usr/local/bin/bfg.jar
           echo '#!/bin/bash' | sudo tee /usr/local/bin/bfg
           echo 'java -jar /usr/local/bin/bfg.jar "$@"' | sudo tee -a /usr/local/bin/bfg
           sudo chmod +x /usr/local/bin/bfg
+          
+          # Install git-filter-repo as backup
+          pip3 install git-filter-repo
 
-      - name: Check for existing GitHub ***REMOVED*** scanning alerts
+      # - name: Clean working directory
+      #   run: |
+      #     git clean -xfd
+          
+
+      # Step 4: Detect ***REMOVED***s using GitHub REST API
+      - name: Detect ***REMOVED***s using GitHub REST API
+        # env:
+        #   ***REMOVED***: ${{ ***REMOVED***s.PAT_TOKEN }}
         run: |
-          echo "🔍 Fetching existing ***REMOVED*** scanning alerts from GitHub..."
+          echo "Fetching ***REMOVED*** scanning alerts..."
+          curl -H "Authorization: ***REMOVED*** $PAT_TOKEN" \
+          -H "Accept: application/vnd.github.v3+json" \
+          "https://api.github.com/repos/${{ github.repository }}/***REMOVED***-scanning/alerts" > ***REMOVED***s.json
+          echo "Secrets fetched and saved to ***REMOVED***s.json"
 
-          curl -s -H "Authorization: ***REMOVED*** $PAT_TOKEN" \
-               -H "Accept: application/vnd.github+json" \
-               "https://api.github.com/repos/${REPO_NAME}/***REMOVED***-scanning/alerts" > alerts.json
-
-          if jq -e 'type == "array"' alerts.json > /dev/null; then
-            COUNT=$(jq '. | length' alerts.json)
-            if [[ "$COUNT" -gt 0 ]]; then
-              echo "🚨 Found $COUNT existing ***REMOVED*** scanning alerts!"
-              jq '.[] | {***REMOVED***_type, state, location}' alerts.json | tee ../***REMOVED***.txt
-            else
-              echo "✅ No existing ***REMOVED*** scanning alerts found."
-              echo "No ***REMOVED***s detected via GitHub ***REMOVED*** scanning API." > ../***REMOVED***.txt
-            fi
-          else
-            echo "⚠️ Unexpected response from GitHub API:"
-            cat alerts.json
-            echo "No valid ***REMOVED*** scanning alerts found." > ../***REMOVED***.txt
-          fi
-
-      - name: Use patterns from file and purge
+      # Step 5: Dump ***REMOVED***s to ***REMOVED***s.txt
+      - name: Dump ***REMOVED***s to ***REMOVED***s.txt
         run: |
+          jq -r '.[] | .***REMOVED***' ***REMOVED***s.json > ***REMOVED***s.txt
+          echo "Secrets dumped to ***REMOVED***s.txt"
+
+      # Step 7: Purge ***REMOVED***s using BFG Repo-Cleaner
+      - name: Purge ***REMOVED***s using BFG Repo-Cleaner
+        run: |
+          echo "Purging ***REMOVED***s using BFG Repo-Cleaner..."
+          java -jar bfg.jar --replace-text ***REMOVED***s.txt
+          echo "Cleaning up repository..."
+          git reflog expire --expire=now --all && git gc --prune=now --aggressive
+          echo "Secrets purged using BFG Repo-Cleaner"
+
+      # Step 8: Trigger GitHub garbage collection
+      - name: Trigger GitHub garbage collection
+        run: |
+          echo "Triggering GitHub garbage collection..."
+          curl -X POST -H "Authorization: ***REMOVED*** $PAT_TOKEN"  -H "Accept: application/vnd.github.v3+json"                https://api.github.com/repos/${{ github.repository }}/actions/garbage-collect
+          echo "GitHub garbage collection triggered"
+
+      # Step 9: Validate the cleaned repository
+      - name: Validate the cleaned repository
+        run: |
+          echo "Validating the cleaned repository..."
+          git fsck
+          echo "Repository validated"
+
+      - name: Prepare and Raise Pull Requests for Cleaned Branches
+        run: |
+          echo "📤 Preparing pull requests for cleaned branches..."
           cd repo.git
+          
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          
+          # Convert from bare to working repo
           git config --bool core.bare false
           git reset --hard
           git clean -fd
-
+          
+          # Loop over original branches (exclude cleanup/* and HEAD)
           for branch in $(git branch -r | grep -vE 'origin/HEAD|origin/cleanup/' | sed 's|origin/||'); do
             CLEAN_BRANCH="cleanup/${branch//\//_}"
 
+            # Clean possible overwritten workflows
             git restore .github/workflows/main.yml || true
             git reset --hard
             git clean -fd
 
+
             echo "🔧 Checking out branch: $branch"
             git checkout -B "$CLEAN_BRANCH" "origin/$branch"
-
-            echo "🧹 Running BFG with external patterns"
+          
+            echo "🧹 Applying BFG cleanup..."
             bfg --replace-text ../***REMOVED***s-patterns.txt --no-blob-protection .
-
+          
             echo "📦 Checking for detected ***REMOVED***s..."
             SECRET_COUNT=$(git log -p | grep -c -f ../***REMOVED***s-patterns.txt || true)
-
+            
             if [[ "$SECRET_COUNT" -eq 0 ]]; then
               echo "ℹ️ No ***REMOVED***s found in $branch — skipping push & PR."
               continue
             fi
-
-            if git diff --quiet; then
-              echo "ℹ️ No changes detected after cleanup — skipping push & PR."
-              continue
-            fi
-
+            
             echo "🧹 Finalizing cleanup with git GC"
             git reflog expire --expire=now --all
             git gc --prune=now --aggressive
-
+            
             echo "📤 Pushing cleaned branch: $CLEAN_BRANCH"
             git push origin "$CLEAN_BRANCH"
-
-            echo "🔍 Checking if PR already exists"
+            
+            echo "🔍 Checking if PR already exists for $CLEAN_BRANCH -> $branch"
             PR_EXISTS=$(curl -s -H "Authorization: ***REMOVED*** $PAT_TOKEN" \
-              "https://api.github.com/repos/${REPO_NAME}/pulls?head=datatest067:${CLEAN_BRANCH}&base=${branch}" | jq '. | length')
-
+              "https://api.github.com/repos/${REPO_NAME}/pulls?head=datatest067:${CLEAN_BRANCH}&base=${branch}" \
+              | jq '. | length')
+            
             if [[ "$PR_EXISTS" -gt 0 ]]; then
               echo "🚫 PR already exists for $branch — skipping."
               continue
             fi
-
+            
             echo "📬 Creating PR for $branch"
             pr_body=$(jq -n \
               --arg title "[SECRETS-CLEANUP] $branch" \
               --arg head "$CLEAN_BRANCH" \
               --arg base "$branch" \
               --arg body "This pull request contains automated ***REMOVED***s cleanup for branch **$branch**.\n\nPlease review changes carefully.\n\n---\n\nGenerated by GitHub Actions." \
-              '{title: $title, head: $head, base: $base, body: $body, labels: ["security", "automated-cleanup"]}')
-
+              '{
+                title: $title,
+                head: $head,
+                base: $base,
+                body: $body,
+                labels: ["security", "automated-cleanup"]
+              }')
+            
             response=$(curl -s -w "%{http_code}" -o response.json -X POST \
               -H "Authorization: ***REMOVED*** $PAT_TOKEN" \
               -H "Accept: application/vnd.github+json" \
               https://api.github.com/repos/$REPO_NAME/pulls \
               -d "$pr_body")
-
+            
             if [[ "$response" != "201" ]]; then
               echo "❌ Failed to create PR for $branch (HTTP $response)"
               cat response.json
@@ -137,8 +230,12 @@ jobs:
             else
               echo "✅ PR created for $branch"
             fi
-
+          
             echo "🧼 Cleaning repo before next iteration"
             git reset --hard
             git clean -fd
+          
           done
+          # env:
+          #   PAT_TOKEN: ${{ ***REMOVED***s.PAT_TOKEN }}
+          #   REPO_NAME: datatest067/***REMOVED***-repo
