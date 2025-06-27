@@ -216,8 +216,8 @@ jobs:
           cd repo.git
           cat ***REMOVED***s.txt
           echo "Purging ***REMOVED***s using BFG Repo-Cleaner..."
-          java -jar ../bfg.jar --replace-text ***REMOVED***s.txt || { echo "❌ BFG failed"; exit 1; }
-          #bfg --replace-text ***REMOVED***s.txt
+          #java -jar ../bfg.jar --replace-text ***REMOVED***s.txt || { echo "❌ BFG failed"; exit 1; }
+          bfg --replace-text ***REMOVED***s.txt
           echo "Cleaning up repository..."
           git reflog expire --expire=now --all && git gc --prune=now --aggressive
           echo "✅ Secrets purged using BFG Repo-Cleaner"
