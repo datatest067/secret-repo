@@ -122,12 +122,24 @@ jobs:
           "https://api.github.com/repos/${{ github.repository }}/secret-scanning/alerts" > secrets.json
           echo "Secrets fetched and saved to secrets.json"
 
-      # Step 5: Dump secrets to secrets.txt
       - name: Dump secrets to secrets.txt
         run: |
           cd repo.git
-          jq -r '.[] | .secret' secrets.json > secrets.txt
-          echo "Secrets dumped to secrets.txt"
+      
+          if jq -e 'type == "array"' secrets.json > /dev/null; then
+            COUNT=$(jq '. | length' secrets.json)
+            if [[ "$COUNT" -gt 0 ]]; then
+              jq -r '.[] | .secret' secrets.json > secrets.txt
+              echo "✅ $COUNT secrets dumped to secrets.txt"
+            else
+              echo "✅ No secrets found. Writing empty file."
+              echo "No secrets found" > secrets.txt
+            fi
+          else
+            echo "⚠️ Unexpected response in secrets.json:"
+            cat secrets.json
+            echo "Invalid secret scanning data" > secrets.txt
+          fi
 
       # Step 7: Purge secrets using BFG Repo-Cleaner
       - name: Purge secrets using BFG Repo-Cleaner
