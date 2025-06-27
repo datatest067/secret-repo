@@ -136,14 +136,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: branch-backup
-          path: branch-backup.zip
+          path: repo.git/branch-backup.zip
         
       # # Step 3: Upload the tag backup as an artifact
       - name: Upload tag backup
         uses: actions/upload-artifact@v4
         with:
           name: tag-backup
-          path: tag-backup.zip
+          path: repo.git/tag-backup.zip
 
       - name: Install git-filter-repo
         run: |
