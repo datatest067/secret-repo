@@ -213,6 +213,7 @@ jobs:
 
       - name: Purge secrets using BFG
         run: |
+          cd repo.git
           cat secrets.txt
           echo "Purging secrets using BFG Repo-Cleaner..."
           java -jar ../bfg.jar --replace-text secrets.txt || { echo "❌ BFG failed"; exit 1; }
