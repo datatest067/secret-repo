@@ -110,8 +110,11 @@ jobs:
           done
           echo "📦 Zipping all branch backups..."
           ls -lh ../$BACKUP_DIR
-          cd ../
+          #cd ../
           zip -r branch-backup.zip $BACKUP_DIR -i "../$BACKUP_DIR/$archive_name"
+          pwd
+          ls -lh
+          
       
       - name: Create Archive Backups for Tags
         run: |
