@@ -23,7 +23,7 @@ body:
   - type: dropdown
     id: include_pipelines
     attributes:
-      label: Migrate Pipelines?
+      label: Secret Removal Pipelines?
       description: Do you want to continue?
       options:
         - "Yes"
