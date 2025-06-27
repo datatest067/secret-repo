@@ -213,6 +213,7 @@ jobs:
 
       - name: Purge ***REMOVED***s using BFG
         run: |
+          cd repo.git
           cat ***REMOVED***s.txt
           echo "Purging ***REMOVED***s using BFG Repo-Cleaner..."
           java -jar ../bfg.jar --replace-text ***REMOVED***s.txt || { echo "❌ BFG failed"; exit 1; }
