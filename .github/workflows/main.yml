@@ -114,6 +114,8 @@ jobs:
         # env:
         #   GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
+          echo "🏷️ Creating Secret File..."
+          cd repo.git
           echo "Fetching secret scanning alerts..."
           curl -H "Authorization: token $PAT_TOKEN" \
           -H "Accept: application/vnd.github.v3+json" \
@@ -123,6 +125,7 @@ jobs:
       # Step 5: Dump secrets to secrets.txt
       - name: Dump secrets to secrets.txt
         run: |
+          cd repo.git
           jq -r '.[] | .secret' secrets.json > secrets.txt
           echo "Secrets dumped to secrets.txt"
 
