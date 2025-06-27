@@ -109,8 +109,9 @@ jobs:
             git archive "$branch" --format=tar --output="../$BACKUP_DIR/$archive_name"
           done
           echo "📦 Zipping all branch backups..."
+          ls -lh ../$BACKUP_DIR
           cd ../
-          zip -r branch-backup.zip $BACKUP_DIR -i "backup-${{ github.repository }}/branch_*.tar"
+          zip -r branch-backup.zip $BACKUP_DIR -i "../$BACKUP_DIR/$archive_name"
       
       - name: Create Archive Backups for Tags
         run: |
