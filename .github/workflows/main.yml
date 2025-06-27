@@ -67,9 +67,9 @@ jobs:
           echo "Include Pipelines: ${{ steps.parse.outputs.include_pipelines }}"
 
       - name: Exit if not approved for Secret Removal
-        if: ${{ steps.parse.outputs.include_pipelines != 'Yes' }}
+        if: ${{ toJSON(steps.parse.outputs.include_pipelines) != '"Yes"' }}
         run: |
-          echo "Pipeline migration not approved. Exiting..."
+          echo "❌ Pipeline migration not approved. Exiting..."
           exit 0
     
       - name: Checkout repository (all history, all refs)
@@ -107,10 +107,10 @@ jobs:
       
             echo "📦 Archiving $branch -> $archive_name"
             git archive "$branch" --format=tar --output="../$BACKUP_DIR/$archive_name"
-            zip branch.zip ../$BACKUP_DIR/$archive_name
           done
-      
-          echo "✅ Branch archive backups created in $BACKUP_DIR"
+          echo "📦 Zipping all branch backups..."
+          cd ../
+          zip -r branch-backup.zip $BACKUP_DIR -i "backup-${{ github.repository }}/branch_*.tar"
       
       - name: Create Archive Backups for Tags
         run: |
@@ -121,10 +121,10 @@ jobs:
             archive_name="tag_${tag//\//_}.tar"
             echo "🏷️ Archiving tag: $tag -> $archive_name"
             git archive "$tag" --format=tar --output="../$BACKUP_DIR/$archive_name"
-            zip tag.zip ../$BACKUP_DIR/$archive_name
           done
-      
-          echo "✅ Tag archive backups created in $BACKUP_DIR"
+          echo "🏷️ Zipping all tag backups..."
+          cd ../
+          zip -r tag-backup.zip $BACKUP_DIR -i "backup-${{ github.repository }}/tag_*.tar"
 
       # # Step 3: Upload the branch backup as an artifact
       - name: Upload branch backup
