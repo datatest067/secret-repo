@@ -196,6 +196,7 @@ jobs:
       - name: Dump secrets to secrets.txt
         run: |
           cd repo.git
+          cat secrets.json
       
           if jq -e 'type == "array"' secrets.json > /dev/null; then
             COUNT=$(jq '. | length' secrets.json)
