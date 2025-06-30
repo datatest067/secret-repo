@@ -168,21 +168,15 @@ jobs:
         run: |
           echo "🏷️ Creating Secret File..."
           cd repo.git
-      
+          echo https://api.github.com/repos/${REPO_NAME}/***REMOVED***-scanning/alerts
+          echo "Authorization: ***REMOVED***", $PAT_TOKEN
           echo "Fetching ***REMOVED*** scanning alerts..."
-          # curl -s -w "%{http_code}" -o ***REMOVED***s.json \
-          #   -H "Authorization: ***REMOVED*** $PAT_TOKEN" \
-          #   -H "Accept: application/vnd.github.v3+json" \
-          #   "https://api.github.com/repos/${{ github.repository }}/***REMOVED***-scanning/alerts" > curl_output.txt
-      
-          # STATUS=$(tail -n1 curl_output.txt)
-          # mv curl_output.txt tmp.json && head -n -1 tmp.json > ***REMOVED***s.json && rm tmp.json
-
           # Run curl and capture both response body and HTTP status code cleanly
           STATUS=$(curl -s -w "%{http_code}" -o ***REMOVED***s.json \
             -H "Authorization: ***REMOVED*** $PAT_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             https://api.github.com/repos/${REPO_NAME}/***REMOVED***-scanning/alerts)
+          echo $STATUS
       
           if [[ "$STATUS" != "200" ]]; then
             echo "❌ GitHub API call failed with status $STATUS"
