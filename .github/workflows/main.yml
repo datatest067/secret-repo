@@ -86,6 +86,7 @@ jobs:
           
           # Clone with PAT authentication for private repo
           git clone https://$PAT_TOKEN@github.com/${{ github.repository }}.git repo.git
+          ls -lrth repo.git
           cd repo.git
           
           # Fetch all references
@@ -93,6 +94,7 @@ jobs:
           git remote set-url origin https://$PAT_TOKEN@github.com/${{ github.repository }}.git
           
           echo "✅ Private repository cloned successfully"
+          
 
       - name: Create Archive Backups for Remote Branches
         run: |
