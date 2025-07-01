@@ -48,9 +48,6 @@ jobs:
   Secret_Removal:
     needs: parse_form
     if: ${{ needs.parse_form.outputs.include_pipelines == 'Yes' }}
-    #if: startsWith(github.event.issue.title, '[Secret-Removal]')
-    #if: startsWith(github.event.issue.title, '[Secret-Removal]') && contains(github.event.issue.body, 'Secret Removal Pipelines?\n\nYes')
-
     runs-on: ubuntu-latest
     env:
       REPO_NAME: ${{ github.repository }}
