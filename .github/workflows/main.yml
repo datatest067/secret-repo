@@ -11,8 +11,46 @@ permissions:
   pull-requests: write
 
 jobs:
+  parse_form:
+    runs-on: ubuntu-latest
+    outputs:
+      include_pipelines: ${{ steps.parse.outputs.include_pipelines }}
+      gh_repo: ${{ steps.parse.outputs.gh_repo }}
+      gh_org: ${{ steps.parse.outputs.gh_org }}
+
+    steps:
+      - name: Parse form inputs from issue body
+        id: parse
+        run: |
+          ISSUE_BODY="${{ github.event.issue.body }}"
+
+          parse_field() {
+            echo "$ISSUE_BODY" | awk -v field="### $1" '
+              $0 == field {
+                while (getline) {
+                  gsub(/^[ \t\r\n]+|[ \t\r\n]+$/, "", $0)
+                  if (length($0) > 0) {
+                    print $0
+                    exit
+                  }
+                }
+              }
+            '
+          }
+
+          GH_REPO=$(parse_field "Target GitHub Repo Name")
+          GH_ORG=$(parse_field "Target GitHub Org Name")
+          INCLUDE_PIPELINES=$(parse_field "Secret Removal Pipelines?")
+
+          echo "gh_repo=$GH_REPO" >> "$GITHUB_OUTPUT"
+          echo "gh_org=$GH_ORG" >> "$GITHUB_OUTPUT"
+          echo "include_pipelines=$INCLUDE_PIPELINES" >> "$GITHUB_OUTPUT"
   Secret_Removal:
-    if: startsWith(github.event.issue.title, '[Secret-Removal]')
+    needs: parse_form
+    if: ${{ needs.parse_form.outputs.include_pipelines == 'Yes' }}
+    #if: startsWith(github.event.issue.title, '[Secret-Removal]')
+    #if: startsWith(github.event.issue.title, '[Secret-Removal]') && contains(github.event.issue.body, 'Secret Removal Pipelines?\n\nYes')
+
     runs-on: ubuntu-latest
     env:
       REPO_NAME: ${{ github.repository }}
