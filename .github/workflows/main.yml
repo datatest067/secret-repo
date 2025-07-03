@@ -19,57 +19,32 @@ jobs:
 
 
     steps:
-      # Step 1: Parse form inputs from the issue body
       - name: Parse form inputs from issue body
-
         id: parse
         run: |
-          # Print the raw issue body for debugging purposes
           echo "🔍 Raw ISSUE_BODY:"
           echo "${{ github.event.issue.body }}"
           echo "------------------------------"
-
+      
           ISSUE_BODY="${{ github.event.issue.body }}"
-
-          # Helper function to extract value under a markdown header
-          parse_field() {
-            echo "$ISSUE_BODY" | awk -v field="### $1" '
-              {
-                gsub(/^[ \t\r\n]+|[ \t\r\n]+$/, "", $0)  # trim whitespace
-              }
-              $0 == field {
-                while (getline) {
-                  gsub(/^[ \t\r\n]+|[ \t\r\n]+$/, "", $0)
-                  if (length($0) > 0) {
-                    print $0
-                    exit
-                  }
-                }
-              }
-            '
-          }
-
-
-
-
-          # Print the parsed values to the console for debugging
+      
+          # Extract GH_REPO value after the header
+          GH_REPO=$(echo "$ISSUE_BODY" | awk '/### Target GitHub Repo Name/{getline; print}' | xargs)
+          GH_ORG=$(echo "$ISSUE_BODY" | awk '/### Target GitHub Org Name/{getline; print}' | xargs)
+      
           echo "✅ Parsed Values:"
           echo "GH_REPO=$GH_REPO"
           echo "GH_ORG=$GH_ORG"
-
-          # Set outputs with explicit checks
-          if [ -z "$GH_REPO" ]; then
-            echo "⚠️ Warning: Repository name is empty"
+      
+          # Validate
+          if [ -z "$GH_REPO" ] || [ -z "$GH_ORG" ]; then
+            echo "❌ One or more required values are missing"
+            exit 1
           fi
-          if [ -z "$GH_ORG" ]; then
-            echo "⚠️ Warning: Organization name is empty"
-          fi
-
-          # Set outputs for use in later steps
+      
           echo "gh_repo=$GH_REPO" >> $GITHUB_OUTPUT
           echo "gh_org=$GH_ORG" >> $GITHUB_OUTPUT
-          
-          # Create temp directory
+      
           mkdir -p $TEMP_DIR
 
       # Step 2: Temporarily disable branch protection
