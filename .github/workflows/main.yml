@@ -303,24 +303,24 @@ jobs:
                 case "${file##*.}" in
                   json)
                     # For JSON files
-                    sed -i "${line}s|***REMOVED***[^\"]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
-                    sed -i "${line}s|***REMOVED***[^\"]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
-                    sed -i "${line}s|***REMOVED***[^\"]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
-                    sed -i "${line}s|***REMOVED***[^\"]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
+                    sed -i "${line}s|***REMOVED***user:***REMOVED***@redacted "$file"
+                    sed -i "${line}s|***REMOVED***user:***REMOVED***@redacted "$file"
+                    sed -i "${line}s|***REMOVED***user:***REMOVED***@redacted "$file"
+                    sed -i "${line}s|***REMOVED***user:***REMOVED***@redacted "$file"
                     ;;
                   yml|yaml)
                     # For YAML files
-                    sed -i "${line}s|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
-                    sed -i "${line}s|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
-                    sed -i "${line}s|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
-                    sed -i "${line}s|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
+                    sed -i "${line}s|***REMOVED***user:***REMOVED***@redacted ]*|***REMOVED***user:***REMOVED***@redacted "$file"
+                    sed -i "${line}s|***REMOVED***user:***REMOVED***@redacted ]*|***REMOVED***user:***REMOVED***@redacted "$file"
+                    sed -i "${line}s|***REMOVED***user:***REMOVED***@redacted ]*|***REMOVED***user:***REMOVED***@redacted "$file"
+                    sed -i "${line}s|***REMOVED***user:***REMOVED***@redacted ]*|***REMOVED***user:***REMOVED***@redacted "$file"
                     ;;
                   *)
                     # For other file types
-                    sed -i "${line}s|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
-                    sed -i "${line}s|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
-                    sed -i "${line}s|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
-                    sed -i "${line}s|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
+                    sed -i "${line}s|***REMOVED***user:***REMOVED***@redacted ]*|***REMOVED***user:***REMOVED***@redacted "$file"
+                    sed -i "${line}s|***REMOVED***user:***REMOVED***@redacted ]*|***REMOVED***user:***REMOVED***@redacted "$file"
+                    sed -i "${line}s|***REMOVED***user:***REMOVED***@redacted ]*|***REMOVED***user:***REMOVED***@redacted "$file"
+                    sed -i "${line}s|***REMOVED***user:***REMOVED***@redacted ]*|***REMOVED***user:***REMOVED***@redacted "$file"
                     ;;
                 esac
                 
@@ -339,10 +339,10 @@ jobs:
             echo "Processing workflow file: $file"
             
             # Replace connection string patterns in workflow files
-            sed -i 's|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g' "$file"
-            sed -i 's|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g' "$file"
-            sed -i 's|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g' "$file"
-            sed -i 's|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g' "$file"
+            sed -i 's|***REMOVED***user:***REMOVED***@redacted ]*|***REMOVED***user:***REMOVED***@redacted "$file"
+            sed -i 's|***REMOVED***user:***REMOVED***@redacted ]*|***REMOVED***user:***REMOVED***@redacted "$file"
+            sed -i 's|***REMOVED***user:***REMOVED***@redacted ]*|***REMOVED***user:***REMOVED***@redacted "$file"
+            sed -i 's|***REMOVED***user:***REMOVED***@redacted ]*|***REMOVED***user:***REMOVED***@redacted "$file"
             
             echo "✅ Processed workflow file: $file"
           done
@@ -350,10 +350,10 @@ jobs:
           # Also check poc.json specifically - FIXED
           if [ -f "poc.json" ]; then
             echo "Processing poc.json..."
-            sed -i 's|"***REMOVED***[^"]*"|"***REMOVED***user:***REMOVED***@redacted"|g' poc.json
-            sed -i 's|"***REMOVED***[^"]*"|"***REMOVED***user:***REMOVED***@redacted"|g' poc.json
-            sed -i 's|"***REMOVED***[^"]*"|"***REMOVED***user:***REMOVED***@redacted"|g' poc.json
-            sed -i 's|"***REMOVED***[^"]*"|"***REMOVED***user:***REMOVED***@redacted"|g' poc.json
+            sed -i 's|"***REMOVED***user:***REMOVED***@redacted poc.json
+            sed -i 's|"***REMOVED***user:***REMOVED***@redacted poc.json
+            sed -i 's|"***REMOVED***user:***REMOVED***@redacted poc.json
+            sed -i 's|"***REMOVED***user:***REMOVED***@redacted poc.json
             sed -i 's|"***REMOVED***"[[:space:]]:[[:space:]]"[^"]*"|"***REMOVED***": "REDACTED"|g' poc.json
             echo "✅ Processed poc.json"
           fi
@@ -382,12 +382,12 @@ jobs:
             fi
             
             echo -e "\n***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
+            echo "***REMOVED***user:***REMOVED***@redacted
+            echo "***REMOVED***user:***REMOVED***@redacted
             
             echo -e "\n***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
+            echo "***REMOVED***user:***REMOVED***@redacted
+            echo "***REMOVED***user:***REMOVED***@redacted
             
             echo -e "\n***REMOVED***"
             echo "***REMOVED***"
