@@ -28,15 +28,26 @@ jobs:
       
           # Assign issue body from GitHub context
           ISSUE_BODY="${{ github.event.issue.body }}"
-          echo "ISSUE_BODY=$ISSUE_BODY"
+        
       
-          # Extract repo and org name using awk and trim spaces
-          GH_REPO=$(echo "$ISSUE_BODY" | awk '/### Target GitHub Repo Name/{getline; print}' | xargs)
-          GH_ORG=$(echo "$ISSUE_BODY" | awk '/### Target GitHub Org Name/{getline; print}' | xargs)
-      
-          echo "✅ Parsed Values:"
+          extract_value() {
+            echo "$ISSUE_BODY" | awk -v header="$1" '
+              $0 ~ header { found=1; next }
+              found && NF { print; exit }
+            ' | xargs
+          }
+          
+          # Extract values
+          GH_REPO=$(extract_value "### Target GitHub Repo Name")
+          GH_ORG=$(extract_value "### Target GitHub Org Name")
+  
+          
+          # Print for debug
           echo "GH_REPO=$GH_REPO"
           echo "GH_ORG=$GH_ORG"
+
+
+
       
           # Validate input
           if [ -z "$GH_REPO" ] || [ -z "$GH_ORG" ]; then
