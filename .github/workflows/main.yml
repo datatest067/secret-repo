@@ -17,8 +17,8 @@ jobs:
       PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
       TEMP_DIR: /tmp/secret-removal
 
+
     steps:
-      # Step 1: Parse form inputs from the issue body
       - name: Parse form inputs from issue body
         id: parse
         run: |
@@ -26,43 +26,33 @@ jobs:
           echo "${{ github.event.issue.body }}"
           echo "------------------------------"
       
-          # ✅ Assign actual GitHub issue body from event
+          # Assign issue body from GitHub context
           ISSUE_BODY="${{ github.event.issue.body }}"
+          echo "ISSUE_BODY=$ISSUE_BODY"
       
-          # Extract GH_REPO value after the header
+          # Extract repo and org name using awk and trim spaces
           GH_REPO=$(echo "$ISSUE_BODY" | awk '/### Target GitHub Repo Name/{getline; print}' | xargs)
           GH_ORG=$(echo "$ISSUE_BODY" | awk '/### Target GitHub Org Name/{getline; print}' | xargs)
       
-          # Print the parsed values to the console for debugging
           echo "✅ Parsed Values:"
           echo "GH_REPO=$GH_REPO"
           echo "GH_ORG=$GH_ORG"
-
-          # Set outputs with explicit checks
-          if [ -z "$GH_REPO" ]; then
-            echo "⚠️ Warning: Repository name is empty"
-            # Fallback to the current repository
-            REPO_NAME="${{ github.repository }}"
-            REPO_PARTS=(${REPO_NAME//\// })
-            GH_REPO="${REPO_PARTS[1]}"
-            echo "Using fallback repository name: $GH_REPO"
+      
+          # Validate input
+          if [ -z "$GH_REPO" ] || [ -z "$GH_ORG" ]; then
+            echo "❌ One or more required values are missing"
+            exit 1
           fi
-          
-          if [ -z "$GH_ORG" ]; then
-            echo "⚠️ Warning: Organization name is empty"
-            # Fallback to the current organization
-            REPO_NAME="${{ github.repository }}"
-            REPO_PARTS=(${REPO_NAME//\// })
-            GH_ORG="${REPO_PARTS[0]}"
-            echo "Using fallback organization name: $GH_ORG"
-          fi
-
-          # Set outputs for use in later steps
+      
+          # Set outputs for use in other steps
           echo "gh_repo=$GH_REPO" >> $GITHUB_OUTPUT
           echo "gh_org=$GH_ORG" >> $GITHUB_OUTPUT
-          
-          # Create temp directory
+      
+          # Create working directory
           mkdir -p $TEMP_DIR
+        env:
+          TEMP_DIR: /tmp/secret-removal
+
 
       # Step 2: Temporarily disable branch protection
       - name: Temporarily disable branch protection
@@ -190,34 +180,34 @@ jobs:
           echo "Fetching all secret scanning alerts..."
           gh api \
             -H "Accept: application/vnd.github+json" \
-            "/repos/$GH_ORG/$GH_REPO/secret-scanning/alerts?state=open&per_page=100" > $TEMP_DIR/reports/all_alerts.json || echo "[]" > $TEMP_DIR/reports/all_alerts.json
+            "/repos/$GH_ORG/$GH_REPO/secret-scanning/alerts?state=open&per_page=100" > $TEMP_DIR/reports/all_alerts.json
           
           # Specifically get generic alerts
           echo "Fetching generic alerts..."
           gh api \
             -H "Accept: application/vnd.github+json" \
-            "/repos/$GH_ORG/$GH_REPO/secret-scanning/alerts?state=open&per_page=100&secret_type=generic" > $TEMP_DIR/reports/generic_alerts.json || echo "[]" > $TEMP_DIR/reports/generic_alerts.json
+            "/repos/$GH_ORG/$GH_REPO/secret-scanning/alerts?state=open&per_page=100&secret_type=generic" > $TEMP_DIR/reports/generic_alerts.json
           
           # Specifically get ***REMOVED*** alerts
           echo "Fetching ***REMOVED*** alerts..."
           gh api \
             -H "Accept: application/vnd.github+json" \
-            "/repos/$GH_ORG/$GH_REPO/secret-scanning/alerts?state=open&per_page=100&secret_type=***REMOVED***" > $TEMP_DIR/reports/***REMOVED***_alerts.json || echo "[]" > $TEMP_DIR/reports/***REMOVED***_alerts.json
+            "/repos/$GH_ORG/$GH_REPO/secret-scanning/alerts?state=open&per_page=100&secret_type=***REMOVED***" > $TEMP_DIR/reports/***REMOVED***_alerts.json
           
           # Combine all alerts into one file
           jq -s '.[0] + .[1] + .[2]' $TEMP_DIR/reports/all_alerts.json $TEMP_DIR/reports/generic_alerts.json $TEMP_DIR/reports/***REMOVED***_alerts.json | jq 'unique_by(.number)' > $TEMP_DIR/reports/alerts.json
           
           # Extract alert numbers for later
-          jq -r '.[].number' $TEMP_DIR/reports/alerts.json > $TEMP_DIR/reports/alert_numbers.txt || echo "" > $TEMP_DIR/reports/alert_numbers.txt
+          jq -r '.[].number' $TEMP_DIR/reports/alerts.json > $TEMP_DIR/reports/alert_numbers.txt
           
           # Create a list of secret types for targeted patterns
-          jq -r '.[] | .secret_type' $TEMP_DIR/reports/alerts.json | sort | uniq > $TEMP_DIR/reports/secret_types.txt || echo "" > $TEMP_DIR/reports/secret_types.txt
+          jq -r '.[] | .secret_type' $TEMP_DIR/reports/alerts.json | sort | uniq > $TEMP_DIR/reports/secret_types.txt
           
           # Extract file paths and line numbers
-          jq -r '.[] | select(.location != null) | .location.path + ":" + (.location.start_line | tostring)' $TEMP_DIR/reports/alerts.json > $TEMP_DIR/reports/file_locations.txt || echo "" > $TEMP_DIR/reports/file_locations.txt
+          jq -r '.[] | select(.location != null) | .location.path + ":" + (.location.start_line | tostring)' $TEMP_DIR/reports/alerts.json > $TEMP_DIR/reports/file_locations.txt
           
           # Create a file with exact secrets (for BFG)
-          jq -r '.[] | .secret' $TEMP_DIR/reports/alerts.json > $TEMP_DIR/reports/exact_secrets.txt || echo "" > $TEMP_DIR/reports/exact_secrets.txt
+          jq -r '.[] | .secret' $TEMP_DIR/reports/alerts.json > $TEMP_DIR/reports/exact_secrets.txt
           
           # Create a detailed report of detected secrets
           {
@@ -229,24 +219,16 @@ jobs:
             echo ""
             
             # List all secret types with counts
-            if [ -s $TEMP_DIR/reports/alerts.json ] && [ "$(cat $TEMP_DIR/reports/alerts.json)" != "[]" ]; then
-              jq -r '.[] | .secret_type' $TEMP_DIR/reports/alerts.json | sort | uniq -c | while read count type; do
-                echo "- *$type*: $count instance(s)"
-              done
-            else
-              echo "No secrets detected."
-            fi
+            jq -r '.[] | .secret_type' $TEMP_DIR/reports/alerts.json | sort | uniq -c | while read count type; do
+              echo "- *$type*: $count instance(s)"
+            done
             
             echo ""
             echo "## Secret Locations"
             echo ""
             
             # List locations without showing actual secrets
-            if [ -s $TEMP_DIR/reports/alerts.json ] && [ "$(cat $TEMP_DIR/reports/alerts.json)" != "[]" ]; then
-              jq -r '.[] | "- *" + .secret_type + "* found in [" + .html_url + "](" + .html_url + ")"' $TEMP_DIR/reports/alerts.json
-            else
-              echo "No secret locations detected."
-            fi
+            jq -r '.[] | "- *" + .secret_type + "* found in [" + .html_url + "](" + .html_url + ")"' $TEMP_DIR/reports/alerts.json
             
             echo ""
             echo "## Secret Details (Masked)"
@@ -255,29 +237,17 @@ jobs:
             echo "| ---- | ------------- | ------------ | --------- |"
             
             # Show masked secrets with file paths
-            if [ -s $TEMP_DIR/reports/alerts.json ] && [ "$(cat $TEMP_DIR/reports/alerts.json)" != "[]" ]; then
-              jq -r '.[] | [.secret_type, (.secret | if length > 8 then (.[:4] + "..." + .[-4:]) else "too_short" end), (.location.path // "N/A")] | @tsv' $TEMP_DIR/reports/alerts.json | 
-              while IFS=$'\t' read -r type masked path; do
-                echo "| $type | ${masked:0:4} | ${masked: -4} | $path |"
-              done
-            else
-              echo "| N/A | N/A | N/A | N/A |"
-            fi
+            jq -r '.[] | [.secret_type, (.secret | if length > 8 then (.[:4] + "..." + .[-4:]) else "too_short" end), (.location.path // "N/A")] | @tsv' $TEMP_DIR/reports/alerts.json | 
+            while IFS=$'\t' read -r type masked path; do
+              echo "| $type | ${masked:0:4} | ${masked: -4} | $path |"
+            done
           } > $TEMP_DIR/artifacts/secrets_detected_report.md
           
           # Create a summary for the output
           echo "report_path=$TEMP_DIR/artifacts/secrets_detected_report.md" >> $GITHUB_OUTPUT
+          echo "secret_count=$(wc -l < $TEMP_DIR/reports/exact_secrets.txt)" >> $GITHUB_OUTPUT
           
-          # Count secrets, handling empty files
-          if [ -s $TEMP_DIR/reports/exact_secrets.txt ]; then
-            SECRET_COUNT=$(wc -l < $TEMP_DIR/reports/exact_secrets.txt)
-          else
-            SECRET_COUNT=0
-          fi
-          
-          echo "secret_count=$SECRET_COUNT" >> $GITHUB_OUTPUT
-          
-          echo "✅ Created report with $SECRET_COUNT detected secrets"
+          echo "✅ Created report with $(wc -l < $TEMP_DIR/reports/exact_secrets.txt) detected secrets"
 
       # Step 8: Upload the secrets report as an artifact
       - name: Upload secrets report
@@ -287,7 +257,7 @@ jobs:
           path: ${{ env.TEMP_DIR }}/artifacts/secrets_detected_report.md
           retention-days: 30
 
-      # Step 9: Direct file modification for specific files - FIXED
+      # Step 9: Direct file modification for specific files (FIXED)
       - name: Direct file modification for specific files
         run: |
           echo "🔧 Directly modifying files with secrets..."
@@ -335,7 +305,7 @@ jobs:
             echo "No file locations found"
           fi
           
-          # Special handling for workflow files - FIXED
+          # Special handling for workflow files
           echo "Checking workflow files for secrets..."
           find .github/workflows -type f -name "*.yml" | while read -r file; do
             echo "Processing workflow file: $file"
@@ -349,11 +319,9 @@ jobs:
             echo "✅ Processed workflow file: $file"
           done
           
-          # Also check poc.json specifically - FIXED
+          # Also check poc.json specifically
           if [ -f "poc.json" ]; then
             echo "Processing poc.json..."
-            sed -i 's|"***REMOVED***[^"]*"|"***REMOVED***user:***REMOVED***@redacted"|g' poc.json
-            sed -i 's|"***REMOVED***[^"]*"|"***REMOVED***user:***REMOVED***@redacted"|g' poc.json
             sed -i 's|"***REMOVED***[^"]*"|"***REMOVED***user:***REMOVED***@redacted"|g' poc.json
             sed -i 's|"***REMOVED***[^"]*"|"***REMOVED***user:***REMOVED***@redacted"|g' poc.json
             sed -i 's|"***REMOVED***"[[:space:]]:[[:space:]]"[^"]*"|"***REMOVED***": "REDACTED"|g' poc.json
@@ -364,7 +332,7 @@ jobs:
           git add .
           git commit -m "Remove secrets from files" || echo "No changes to commit"
 
-      # Step 10: Purge secrets using BFG with enhanced ***REMOVED*** patterns - FIXED
+      # Step 10: Purge secrets using BFG with enhanced ***REMOVED*** patterns
       - name: Purge secrets using BFG
         run: |
           echo "🧹 Purging secrets using BFG Repo-Cleaner..."
@@ -375,13 +343,11 @@ jobs:
           # Create a comprehensive patterns file
           {
             echo "***REMOVED***"
-            if [ -s $TEMP_DIR/reports/exact_secrets.txt ]; then
-              cat $TEMP_DIR/reports/exact_secrets.txt | while read -r secret; do
-                # Escape special characters for regex
-                escaped_secret=$(echo "$secret" | sed 's/[.*+?^${}()|[\]\\]/\\&/g')
-                echo "$escaped_secret"
-              done
-            fi
+            cat $TEMP_DIR/reports/exact_secrets.txt | while read -r secret; do
+              # Escape special characters for regex
+              escaped_secret=$(echo "$secret" | sed 's/[.*+?^${}()|[\]\\]/\\&/g')
+              echo "$escaped_secret"
+            done
             
             echo -e "\n***REMOVED***"
             echo "***REMOVED***"
@@ -457,11 +423,8 @@ jobs:
         run: |
           echo "🔒 Handling secret scanning alerts..."
           
-          # Create artifacts directory if it doesn't exist
-          mkdir -p $TEMP_DIR/artifacts
-          
           # Check if we have alert numbers
-          if [ -s "$TEMP_DIR/reports/alert_numbers.txt" ]; then
+          if [ -f "$TEMP_DIR/reports/alert_numbers.txt" ]; then
             # Create a report of alerts that need manual dismissal
             {
               echo "# Secret Scanning Alerts Requiring Manual Dismissal"
@@ -620,4 +583,3 @@ jobs:
           rm -rf $GITHUB_WORKSPACE/reports
           
           echo "✅ Temporary files cleaned up"
-          echo "All temporary files and directories have been removed."
