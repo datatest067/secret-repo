@@ -19,33 +19,39 @@ jobs:
 
 
     steps:
-      - name: Parse form inputs from issue body
-        id: parse
-        run: |
-          echo "🔍 Raw ISSUE_BODY:"
-          echo "${{ github.event.issue.body }}"
-          echo "------------------------------"
-      
-          ISSUE_BODY="${{ github.event.issue.body }}"
-      
-          # Extract GH_REPO value after the header
-          GH_REPO=$(echo "$ISSUE_BODY" | awk '/### Target GitHub Repo Name/{getline; print}' | xargs)
-          GH_ORG=$(echo "$ISSUE_BODY" | awk '/### Target GitHub Org Name/{getline; print}' | xargs)
-      
-          echo "✅ Parsed Values:"
-          echo "GH_REPO=$GH_REPO"
-          echo "GH_ORG=$GH_ORG"
-      
-          # Validate
-          if [ -z "$GH_REPO" ] || [ -z "$GH_ORG" ]; then
-            echo "❌ One or more required values are missing"
-            exit 1
-          fi
-      
-          echo "gh_repo=$GH_REPO" >> $GITHUB_OUTPUT
-          echo "gh_org=$GH_ORG" >> $GITHUB_OUTPUT
-      
-          mkdir -p $TEMP_DIR
+    - name: Parse form inputs from issue body
+      id: parse
+      run: |
+        echo "🔍 Raw ISSUE_BODY:"
+        echo "${{ github.event.issue.body }}"
+        echo "------------------------------"
+    
+        # Assign issue body from GitHub context
+        ISSUE_BODY="${{ github.event.issue.body }}"
+    
+        # Extract repo and org name using awk and trim spaces
+        GH_REPO=$(echo "$ISSUE_BODY" | awk '/### Target GitHub Repo Name/{getline; print}' | xargs)
+        GH_ORG=$(echo "$ISSUE_BODY" | awk '/### Target GitHub Org Name/{getline; print}' | xargs)
+    
+        echo "✅ Parsed Values:"
+        echo "GH_REPO=$GH_REPO"
+        echo "GH_ORG=$GH_ORG"
+    
+        # Validate input
+        if [ -z "$GH_REPO" ] || [ -z "$GH_ORG" ]; then
+          echo "❌ One or more required values are missing"
+          exit 1
+        fi
+    
+        # Set outputs for use in other steps
+        echo "gh_repo=$GH_REPO" >> $GITHUB_OUTPUT
+        echo "gh_org=$GH_ORG" >> $GITHUB_OUTPUT
+    
+        # Create working directory
+        mkdir -p $TEMP_DIR
+      env:
+        TEMP_DIR: /tmp/secret-removal
+
 
       # Step 2: Temporarily disable branch protection
       - name: Temporarily disable branch protection
