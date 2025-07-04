@@ -4,227 +4,227 @@ title: "[Secret-Removal]: Remediate Secrets in this Repository"
 labels: [security, automation]
 
 body:
-  - type: input
-    id: gh_repo
-    attributes:
-      label: Target GitHub Repo Name
-      placeholder: e.g., 
-      description: Please provide the name of the GitHub repository from which you want to remove secrets
-    validations:
-      required: true
+  # - type: input
+  #   id: gh_repo
+  #   attributes:
+  #     label: Target GitHub Repo Name
+  #     placeholder: e.g., 
+  #     description: Please provide the name of the GitHub repository from which you want to remove secrets
+  #   validations:
+  #     required: true
 
-  - type: input
-    id: gh_org
-    attributes:
-      label: Target GitHub Org Name
-      placeholder: e.g., 
-      description: Please provide the name of the GitHub organization that owns the repository
-    validations:
-      required: true
+  # - type: input
+  #   id: gh_org
+  #   attributes:
+  #     label: Target GitHub Org Name
+  #     placeholder: e.g., 
+  #     description: Please provide the name of the GitHub organization that owns the repository
+  #   validations:
+  #     required: true
       
-  # - type: markdown
-  #   attributes:
-  #     value: |
-  #       ## Secret Removal Automation
+  - type: markdown
+    attributes:
+      value: |
+        ## Secret Removal Automation
 
-  #       Use this form to start an automated process that will remove exposed secrets from the repository's entire Git history.
+        Use this form to start an automated process that will remove exposed secrets from the repository's entire Git history.
 
-  #       *Important:* The process will create a full backup of the repository as a workflow artifact before making any changes.
+        *Important:* The process will create a full backup of the repository as a workflow artifact before making any changes.
 
-  #       ### What is Secret Removal?
+        ### What is Secret Removal?
 
-  #       Secret removal is the process of scanning your repository's entire history for sensitive information such as API keys, **REMOVED**s, tokens, or other credentials that may have been accidentally committed. This workflow will identify and permanently remove these secrets from all commits, branches, and tags.
+        Secret removal is the process of scanning your repository's entire history for sensitive information such as API keys, **REMOVED**s, tokens, or other credentials that may have been accidentally committed. This workflow will identify and permanently remove these secrets from all commits, branches, and tags.
 
-  #       ### Why is This Necessary?
+        ### Why is This Necessary?
 
-  #       Exposed secrets in your repository can lead to unauthorized access, data breaches, or abuse of your cloud resources. Removing secrets from your Git history helps prevent credential leaks and improves your repository's security posture.
+        Exposed secrets in your repository can lead to unauthorized access, data breaches, or abuse of your cloud resources. Removing secrets from your Git history helps prevent credential leaks and improves your repository's security posture.
 
-  #       ### How Does This Work?
+        ### How Does This Work?
 
-  #       - The workflow will *scan* your repository for known secret patterns and use GitHub's Secret Scanning capabilities.
-  #       - If secrets are found, it will *rewrite the entire Git history* to remove them.
-  #       - The cleaned history will be *force pushed* to the remote repository, replacing the old history.
-  #       - A *backup* of the repository (all branches and tags) will be saved as a workflow artifact for recovery if needed.
+        - The workflow will *scan* your repository for known secret patterns and use GitHub's Secret Scanning capabilities.
+        - If secrets are found, it will *rewrite the entire Git history* to remove them.
+        - The cleaned history will be *force pushed* to the remote repository, replacing the old history.
+        - A *backup* of the repository (all branches and tags) will be saved as a workflow artifact for recovery if needed.
 
-  #       ### Who Should Use This?
+        ### Who Should Use This?
 
-  #       - Repository administrators or maintainers who have detected exposed secrets in the repository.
-  #       - Teams who want to ensure their repository history is free of sensitive information.
+        - Repository administrators or maintainers who have detected exposed secrets in the repository.
+        - Teams who want to ensure their repository history is free of sensitive information.
 
-  #       > *Warning:* This is a destructive operation. All collaborators will need to update their local repositories after the process completes.
+        > *Warning:* This is a destructive operation. All collaborators will need to update their local repositories after the process completes.
 
-  # - type: checkboxes
-  #   id: confirm_secret_removal_automation
-  #   attributes:
-  #     label: "Confirmation: Secret Removal Automation"
-  #     description: Please confirm that you have read and understand the "Secret Removal Automation" section above.
-  #     options:
-  #       - label: I have read and understand the "Secret Removal Automation" section.
-  #         required: true
+  - type: checkboxes
+    id: confirm_secret_removal_automation
+    attributes:
+      label: "Confirmation: Secret Removal Automation"
+      description: Please confirm that you have read and understand the "Secret Removal Automation" section above.
+      options:
+        - label: I have read and understand the "Secret Removal Automation" section.
+          required: true
 
-  # - type: markdown
-  #   attributes:
-  #     value: |
-  #       ## What This Process Will Do
+  - type: markdown
+    attributes:
+      value: |
+        ## What This Process Will Do
 
-  #       The workflow will perform the following steps in detail:
+        The workflow will perform the following steps in detail:
 
-  #       1. *Backup:*
-  #          - Create a complete, timestamped backup of the repository, including all branches and tags, using git clone --mirror.
-  #          - Compress the backup and upload it as a workflow artifact to GitHub Actions for safe retrieval.
-  #          - This ensures you can restore the repository to its original state if needed.
+        1. *Backup:*
+           - Create a complete, timestamped backup of the repository, including all branches and tags, using git clone --mirror.
+           - Compress the backup and upload it as a workflow artifact to GitHub Actions for safe retrieval.
+           - This ensures you can restore the repository to its original state if needed.
 
-  #       2. *Scan for Secrets:*
-  #          - Use GitHub Secret Scanning to automatically detect known secret types (API keys, tokens, **REMOVED**s, etc.) in the entire repository history.
-  #          - Supplement scanning with additional tools and regular expressions to catch custom or less common secret patterns.
-  #          - Generate a detailed report listing all detected secrets, their locations (commit hashes, file paths), and types.
+        2. *Scan for Secrets:*
+           - Use GitHub Secret Scanning to automatically detect known secret types (API keys, tokens, **REMOVED**s, etc.) in the entire repository history.
+           - Supplement scanning with additional tools and regular expressions to catch custom or less common secret patterns.
+           - Generate a detailed report listing all detected secrets, their locations (commit hashes, file paths), and types.
 
-  #       3. *Remove Secrets:*
-  #          - Use tools such as [git filter-repo](https://github.com/newren/git-filter-repo) or [BFG Repo-Cleaner](https://rtyley.github.io/bfg-repo-cleaner/) to rewrite the entire Git history.
-  #          - Remove all detected secrets from every commit, branch, and tag, ensuring no trace remains in the repository.
-  #          - Sanitize commit messages and file contents as needed to eliminate references to sensitive data.
-  #          - Validate the cleaned history by re-scanning to confirm all secrets have been removed.
+        3. *Remove Secrets:*
+           - Use tools such as [git filter-repo](https://github.com/newren/git-filter-repo) or [BFG Repo-Cleaner](https://rtyley.github.io/bfg-repo-cleaner/) to rewrite the entire Git history.
+           - Remove all detected secrets from every commit, branch, and tag, ensuring no trace remains in the repository.
+           - Sanitize commit messages and file contents as needed to eliminate references to sensitive data.
+           - Validate the cleaned history by re-scanning to confirm all secrets have been removed.
 
-  #       4. *Force Push:*
-  #          - Force push the rewritten, sanitized history to the remote repository, replacing all branches and tags.
-  #          - This step is destructive and will overwrite the repository's history on GitHub.
-  #          - All collaborators will need to re-clone or reset their local repositories to avoid conflicts.
+        4. *Force Push:*
+           - Force push the rewritten, sanitized history to the remote repository, replacing all branches and tags.
+           - This step is destructive and will overwrite the repository's history on GitHub.
+           - All collaborators will need to re-clone or reset their local repositories to avoid conflicts.
 
-  #       5. *Notify and Document:*
-  #          - Automatically post a summary comment on this issue with details of the actions taken, including a link to the backup artifact and a summary of removed secrets (without exposing sensitive values).
-  #          - Optionally, notify repository collaborators via GitHub notifications or email.
+        5. *Notify and Document:*
+           - Automatically post a summary comment on this issue with details of the actions taken, including a link to the backup artifact and a summary of removed secrets (without exposing sensitive values).
+           - Optionally, notify repository collaborators via GitHub notifications or email.
 
-  #       *Note:* This process is irreversible and will affect all forks and clones of the repository. Ensure all collaborators are aware and have backed up their work before proceeding.
+        *Note:* This process is irreversible and will affect all forks and clones of the repository. Ensure all collaborators are aware and have backed up their work before proceeding.
 
-  # - type: checkboxes
-  #   id: confirm_what_this_process_will_do
-  #   attributes:
-  #     label: "Confirmation: What This Process Will Do"
-  #     description: Please confirm that you have read and understand the "What This Process Will Do" section above.
-  #     options:
-  #       - label: I have read and understand the "What This Process Will Do" section.
-  #         required: true
+  - type: checkboxes
+    id: confirm_what_this_process_will_do
+    attributes:
+      label: "Confirmation: What This Process Will Do"
+      description: Please confirm that you have read and understand the "What This Process Will Do" section above.
+      options:
+        - label: I have read and understand the "What This Process Will Do" section.
+          required: true
 
-  # - type: markdown
-  #   attributes:
-  #     value: |
-  #       ## Before You Begin
+  - type: markdown
+    attributes:
+      value: |
+        ## Before You Begin
 
-  #       Please complete the following steps before submitting this request. These steps are critical to ensure a smooth and safe secret removal process:
+        Please complete the following steps before submitting this request. These steps are critical to ensure a smooth and safe secret removal process:
 
-  #       1. *Notify Collaborators:*
-  #          - Inform all repository collaborators and stakeholders that the repository's entire Git history will be rewritten.
-  #          - Advise them to pause any ongoing work and avoid pushing new commits until the process is complete.
-  #          - Example message to send:
+        1. *Notify Collaborators:*
+           - Inform all repository collaborators and stakeholders that the repository's entire Git history will be rewritten.
+           - Advise them to pause any ongoing work and avoid pushing new commits until the process is complete.
+           - Example message to send:
              
-  #            Attention: We are about to rewrite the repository history to remove exposed secrets. Please do not push any new commits until further notice. Backup your local changes if needed.
-             
-
-  #       2. *Backup Locally (Optional but Recommended):*
-  #          - Create your own local backup of the repository in addition to the automated backup.
-  #          - Run the following command to create a mirror clone (includes all branches, tags, and refs):
-             
-  #            git clone --mirror https://github.com/<org>/<repo>.git
-             
-  #          - Replace <org> and <repo> with your repository details.
-  #          - Store this backup in a safe location in case you need to restore or reference the original history.
-
-  #       3. *Revoke and Rotate Exposed Credentials:*
-  #          - Immediately revoke any exposed secrets (API keys, tokens, **REMOVED**s, etc.) that have been committed to the repository.
-  #          - Rotate credentials by generating new ones and updating any dependent systems or services.
-  #          - Document which credentials were revoked and ensure all systems are updated to use the new values.
-
-  #       4. *Temporarily Disable Branch Protection Rules:*
-  #          - Force pushing rewritten history requires branch protection rules (such as "Require pull request reviews" or "Require status checks") to be temporarily disabled.
-  #          - To disable branch protection:
-  #            - Go to your repository on GitHub.
-  #            - Click on "Settings" > "Branches".
-  #            - Under "Branch protection rules", click "Edit" next to the protected branch (e.g., main).
-  #            - Uncheck or disable any rules that prevent force pushes.
-  #            - Save your changes.
-  #          - *Note:* Remember to re-enable these protections after the process is complete.
-
-  #       5. *Pause CI/CD Pipelines (If Applicable):*
-  #          - If you have automated CI/CD pipelines or integrations that trigger on push events, consider pausing or disabling them temporarily to avoid unintended runs during the history rewrite.
-
-  #       6. *Communicate Timeline and Next Steps:*
-  #          - Let collaborators know when the process will start and provide instructions for updating their local repositories after completion.
-  #          - Example instructions for collaborators (to be used after the process):
-             
-  #            After the history rewrite, you must re-clone the repository or run:
-  #              git fetch --all
-  #              git reset --hard origin/main
-  #              git clean -fdx
-  #            Backup any local changes before running these commands.
+             Attention: We are about to rewrite the repository history to remove exposed secrets. Please do not push any new commits until further notice. Backup your local changes if needed.
              
 
-  #       Completing these steps will help ensure a safe and coordinated secret removal process with minimal disruption to your team.
+        2. *Backup Locally (Optional but Recommended):*
+           - Create your own local backup of the repository in addition to the automated backup.
+           - Run the following command to create a mirror clone (includes all branches, tags, and refs):
+             
+             git clone --mirror https://github.com/<org>/<repo>.git
+             
+           - Replace <org> and <repo> with your repository details.
+           - Store this backup in a safe location in case you need to restore or reference the original history.
 
-  # - type: checkboxes
-  #   id: confirm_before_you_begin
-  #   attributes:
-  #     label: "Confirmation: Before You Begin"
-  #     description: Please confirm that you have read and understand the "Before You Begin" section above.
-  #     options:
-  #       - label: I have read and understand the "Before You Begin" section.
-  #         required: true
+        3. *Revoke and Rotate Exposed Credentials:*
+           - Immediately revoke any exposed secrets (API keys, tokens, **REMOVED**s, etc.) that have been committed to the repository.
+           - Rotate credentials by generating new ones and updating any dependent systems or services.
+           - Document which credentials were revoked and ensure all systems are updated to use the new values.
 
-  # - type: checkboxes
-  #   id: confirm_destructive
-  #   attributes:
-  #     label: Confirmation Required
-  #     description: Please confirm that you have completed the steps above and understand the implications.
-  #     options:
-  #       - label: I understand this is a destructive operation that will rewrite Git history and cannot be undone.
-  #         required: true
-  #       - label: I have notified all repository collaborators about this operation.
-  #         required: true
+        4. *Temporarily Disable Branch Protection Rules:*
+           - Force pushing rewritten history requires branch protection rules (such as "Require pull request reviews" or "Require status checks") to be temporarily disabled.
+           - To disable branch protection:
+             - Go to your repository on GitHub.
+             - Click on "Settings" > "Branches".
+             - Under "Branch protection rules", click "Edit" next to the protected branch (e.g., main).
+             - Uncheck or disable any rules that prevent force pushes.
+             - Save your changes.
+           - *Note:* Remember to re-enable these protections after the process is complete.
 
-  # - type: markdown
-  #   attributes:
-  #     value: |
-  #       ## What to Do After Completion
+        5. *Pause CI/CD Pipelines (If Applicable):*
+           - If you have automated CI/CD pipelines or integrations that trigger on push events, consider pausing or disabling them temporarily to avoid unintended runs during the history rewrite.
 
-  #       After the workflow finishes:
-  #       1. *Download Backup:* Download the backup artifact from the workflow run if you need to restore the repository.
-  #          - Go to the "Actions" tab in your GitHub repository.
-  #          - Select the workflow run triggered by this request.
-  #          - Scroll down to the "Artifacts" section and click on the backup artifact to download it.
-  #       2. *Update Local Repositories:* Instruct all collaborators to update their local repositories after the history rewrite. Each collaborator should:
-  #          - Delete their local repository clone (recommended), or alternatively:
-  #          - Run the following commands in their local repository:
-  #            - git fetch --all
-  #            - git reset --hard origin/main (replace main with your branch name if different)
-  #            - git clean -fdx (to remove untracked files and directories)
-  #          - If they have local branches with work in progress, they should back up their changes before running these commands, as this process will overwrite local history.
-  #          - If using forks, re-fork the repository or update the fork using a similar process.
-  #          - git fetch --all
-  #          - git reset --hard origin/main (or the relevant branch)
-  #       3. *Verify Removal:* Check that all secrets have been removed from the repository history.
-  #          - Use [GitHub Secret Scanning](https://docs.github.com/en/code-security/secret-scanning/about-secret-scanning) to confirm no secrets are detected in the repository.
-  #          - Manually inspect the repository by searching for known secrets or patterns in the codebase and commit history.
-  #          - Optionally, use tools such as [truffleHog](https://github.com/trufflesecurity/trufflehog), [git-secrets](https://github.com/awslabs/git-secrets), or [gitleaks](https://github.com/gitleaks/gitleaks) to scan the repository for any remaining secrets.
-  #          - Review the workflow summary and logs for any warnings or errors related to secret removal.
-  #       4. *Restore Protections:* Re-enable any branch protection rules that were temporarily disabled.
-  #          - Go to your repository on GitHub.
-  #          - Click on "Settings" > "Branches".
-  #          - Under "Branch protection rules", locate the rule(s) you disabled.
-  #          - Click "Edit" next to each rule and re-enable the desired protections (e.g., require pull request reviews, status checks, etc.).
-  #          - Save your changes to ensure protections are active again.
-  #          - If you use custom branch protection settings (such as required status checks, code owners, or restrictions on who can push), review each setting to ensure it matches your team's security and workflow requirements.
-  #          - Consider enabling additional protections, such as requiring signed commits or enabling GitHub's "Require linear history" option, to further secure your repository after the history rewrite.
-  #          - Notify your team that branch protections are restored and normal development workflows can resume.
+        6. *Communicate Timeline and Next Steps:*
+           - Let collaborators know when the process will start and provide instructions for updating their local repositories after completion.
+           - Example instructions for collaborators (to be used after the process):
+             
+             After the history rewrite, you must re-clone the repository or run:
+               git fetch --all
+               git reset --hard origin/main
+               git clean -fdx
+             Backup any local changes before running these commands.
+             
 
-  #       The workflow will automatically close this issue and provide a summary of the actions taken when complete.
+        Completing these steps will help ensure a safe and coordinated secret removal process with minimal disruption to your team.
 
-  # - type: checkboxes
-  #   id: confirm_what_to_do_after_completion
-  #   attributes:
-  #     label: "Confirmation: What to Do After Completion"
-  #     description: Please confirm that you have read and understand the "What to Do After Completion" section above.
-  #     options:
-  #       - label: I have read and understand the "What to Do After Completion" section.
-  #         required: true
+  - type: checkboxes
+    id: confirm_before_you_begin
+    attributes:
+      label: "Confirmation: Before You Begin"
+      description: Please confirm that you have read and understand the "Before You Begin" section above.
+      options:
+        - label: I have read and understand the "Before You Begin" section.
+          required: true
+
+  - type: checkboxes
+    id: confirm_destructive
+    attributes:
+      label: Confirmation Required
+      description: Please confirm that you have completed the steps above and understand the implications.
+      options:
+        - label: I understand this is a destructive operation that will rewrite Git history and cannot be undone.
+          required: true
+        - label: I have notified all repository collaborators about this operation.
+          required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ## What to Do After Completion
+
+        After the workflow finishes:
+        1. *Download Backup:* Download the backup artifact from the workflow run if you need to restore the repository.
+           - Go to the "Actions" tab in your GitHub repository.
+           - Select the workflow run triggered by this request.
+           - Scroll down to the "Artifacts" section and click on the backup artifact to download it.
+        2. *Update Local Repositories:* Instruct all collaborators to update their local repositories after the history rewrite. Each collaborator should:
+           - Delete their local repository clone (recommended), or alternatively:
+           - Run the following commands in their local repository:
+             - git fetch --all
+             - git reset --hard origin/main (replace main with your branch name if different)
+             - git clean -fdx (to remove untracked files and directories)
+           - If they have local branches with work in progress, they should back up their changes before running these commands, as this process will overwrite local history.
+           - If using forks, re-fork the repository or update the fork using a similar process.
+           - git fetch --all
+           - git reset --hard origin/main (or the relevant branch)
+        3. *Verify Removal:* Check that all secrets have been removed from the repository history.
+           - Use [GitHub Secret Scanning](https://docs.github.com/en/code-security/secret-scanning/about-secret-scanning) to confirm no secrets are detected in the repository.
+           - Manually inspect the repository by searching for known secrets or patterns in the codebase and commit history.
+           - Optionally, use tools such as [truffleHog](https://github.com/trufflesecurity/trufflehog), [git-secrets](https://github.com/awslabs/git-secrets), or [gitleaks](https://github.com/gitleaks/gitleaks) to scan the repository for any remaining secrets.
+           - Review the workflow summary and logs for any warnings or errors related to secret removal.
+        4. *Restore Protections:* Re-enable any branch protection rules that were temporarily disabled.
+           - Go to your repository on GitHub.
+           - Click on "Settings" > "Branches".
+           - Under "Branch protection rules", locate the rule(s) you disabled.
+           - Click "Edit" next to each rule and re-enable the desired protections (e.g., require pull request reviews, status checks, etc.).
+           - Save your changes to ensure protections are active again.
+           - If you use custom branch protection settings (such as required status checks, code owners, or restrictions on who can push), review each setting to ensure it matches your team's security and workflow requirements.
+           - Consider enabling additional protections, such as requiring signed commits or enabling GitHub's "Require linear history" option, to further secure your repository after the history rewrite.
+           - Notify your team that branch protections are restored and normal development workflows can resume.
+
+        The workflow will automatically close this issue and provide a summary of the actions taken when complete.
+
+  - type: checkboxes
+    id: confirm_what_to_do_after_completion
+    attributes:
+      label: "Confirmation: What to Do After Completion"
+      description: Please confirm that you have read and understand the "What to Do After Completion" section above.
+      options:
+        - label: I have read and understand the "What to Do After Completion" section.
+          required: true
 
 
 # name: 🚚 GitHub Secret Removal
