@@ -28,9 +28,7 @@ jobs:
           # Use grep to extract values - much simpler and more reliable
           GH_REPO="secret-repo"
           GH_ORG="datatest067"
-          # GH_REPO=$(echo '${{ github.event.issue.body }}' | grep -A 2 "Target GitHub Repo Name" | tail -n 1 | tr -d ' \r\n')
-          # GH_ORG=$(echo '${{ github.event.issue.body }}' | grep -A 2 "Target GitHub Org Name" | tail -n 1 | tr -d ' \r\n')
-          
+
           
           # Print for debug
           echo "GH_REPO=$GH_REPO"
