@@ -15,6 +15,7 @@ jobs:
     env:
       PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
       TEMP_DIR: /tmp/secret-removal
+      TOKEN: "ghp_DUb0aQxu5M0ZYQQTsPbHBNtMv7vd"
 
     steps:
       # Step 1: Parse form inputs from the issue body - SIMPLIFIED
