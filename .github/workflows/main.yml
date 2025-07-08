@@ -281,9 +281,9 @@ jobs:
               echo "⚠️ File not found: $file"
             fi
           done < "$TEMP_DIR/reports/file_locations.txt"
-        else
+         else
           echo "No file locations found"
-        fi
+         fi
         
         # Workflow files
         echo "Checking workflow files for secrets..."
