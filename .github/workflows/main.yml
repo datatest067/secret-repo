@@ -227,6 +227,81 @@ jobs:
           path: ${{ env.TEMP_DIR }}/artifacts/secrets_detected_report.md
           retention-days: 30
 
+      - name: Direct file modification for specific files
+        run: |
+          echo "🔧 Directly modifying files with secrets..."
+          
+          # Check if we have file locations
+          if [ -s $TEMP_DIR/reports/file_locations.txt ]; then
+            echo "Found $(wc -l < $TEMP_DIR/reports/file_locations.txt) file locations"
+            
+            # Process each file location
+            cat $TEMP_DIR/reports/file_locations.txt | while IFS=: read -r file line; do
+              if [ -f "$file" ]; then
+                echo "Processing $file:$line"
+                
+                # Replace the line with a placeholder based on file extension
+                case "${file##*.}" in
+                  json)
+                    # For JSON files
+                    sed -i "${line}s|***REMOVED***[^\"]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
+                    sed -i "${line}s|***REMOVED***[^\"]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
+                    sed -i "${line}s|***REMOVED***[^\"]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
+                    sed -i "${line}s|***REMOVED***[^\"]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
+                    ;;
+                  yml|yaml)
+                    # For YAML files
+                    sed -i "${line}s|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
+                    sed -i "${line}s|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
+                    sed -i "${line}s|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
+                    sed -i "${line}s|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
+                    ;;
+                  *)
+                    # For other file types
+                    sed -i "${line}s|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
+                    sed -i "${line}s|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
+                    sed -i "${line}s|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
+                    sed -i "${line}s|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
+                    ;;
+                esac
+                
+                echo "✅ Modified $file"
+              else
+                echo "⚠️ File not found: $file"
+              fi
+            done
+          else
+            echo "No file locations found"
+          fi
+          
+          # Special handling for workflow files
+          echo "Checking workflow files for secrets..."
+          find .github/workflows -type f -name "*.yml" | while read -r file; do
+            echo "Processing workflow file: $file"
+            
+            # Replace connection string patterns in workflow files
+            sed -i 's|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g' "$file"
+            sed -i 's|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g' "$file"
+            sed -i 's|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g' "$file"
+            sed -i 's|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g' "$file"
+            
+            echo "✅ Processed workflow file: $file"
+          done
+          
+          # Also check poc.json specifically
+          if [ -f "poc.json" ]; then
+            echo "Processing poc.json..."
+            sed -i 's|"***REMOVED***[^"]*"|"***REMOVED***user:***REMOVED***@redacted"|g' poc.json
+            sed -i 's|"***REMOVED***[^"]*"|"***REMOVED***user:***REMOVED***@redacted"|g' poc.json
+            sed -i 's|"***REMOVED***[^"]*"|"***REMOVED***user:***REMOVED***@redacted"|g' poc.json
+            sed -i 's|"***REMOVED***[^"]*"|"***REMOVED***user:***REMOVED***@redacted"|g' poc.json
+            sed -i 's|"***REMOVED***"[[:space:]]:[[:space:]]"[^"]*"|"***REMOVED***": "REDACTED"|g' poc.json
+            echo "✅ Processed poc.json"
+          fi
+          
+          # Commit the changes
+          git add .
+          git commit -m "Remove secrets from files" || echo "No changes to commit"
       - name: Purge secrets using BFG
         run: |
           echo "***REMOVED***" > $TEMP_DIR/patterns.txt
