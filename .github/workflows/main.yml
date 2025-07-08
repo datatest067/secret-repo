@@ -58,18 +58,20 @@ jobs:
         run: echo "$PAT_TOKEN" | gh auth login --with-token
 
       - name: Get default branch & disable protection
+        env:
+          REPO: ${{ steps.parse.outputs.gh_repo }}
+          ORG: ${{ steps.parse.outputs.gh_org }}
         run: |
-          ORG=${{ steps.setup.outputs.gh_org }}
-          REPO=${{ steps.setup.outputs.gh_repo }}
           DEFAULT_BRANCH=$(gh api "/repos/$ORG/$REPO" | jq -r '.default_branch')
           echo "Default branch: $DEFAULT_BRANCH"
           gh api "/repos/$ORG/$REPO/branches/$DEFAULT_BRANCH/protection" > $TEMP_DIR/branch_protection.json || echo '{}' > $TEMP_DIR/branch_protection.json
           curl -s -X DELETE -H "Authorization: token $PAT_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$ORG/$REPO/branches/$DEFAULT_BRANCH/protection"
 
       - name: Clone repo & backup
+        env:
+          REPO: ${{ steps.parse.outputs.gh_repo }}
+          ORG: ${{ steps.parse.outputs.gh_org }}
         run: |
-          ORG=${{ steps.setup.outputs.gh_org }}
-          REPO=${{ steps.setup.outputs.gh_repo }}
           BACKUP_DIR="$TEMP_DIR/backup-$REPO"
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
@@ -84,9 +86,10 @@ jobs:
           path: ${{ env.TEMP_DIR }}/artifacts/${{ steps.setup.outputs.gh_repo }}-backup.zip
 
       - name: Secret scanning report
+        env:
+          REPO: ${{ steps.parse.outputs.gh_repo }}
+          ORG: ${{ steps.parse.outputs.gh_org }}
         run: |
-          ORG=${{ steps.setup.outputs.gh_org }}
-          REPO=${{ steps.setup.outputs.gh_repo }}
           mkdir -p $TEMP_DIR/reports
           gh api "/repos/$ORG/$REPO/secret-scanning/alerts?state=open&per_page=100" > $TEMP_DIR/reports/alerts.json || echo "[]" > $TEMP_DIR/reports/alerts.json
           jq -r '.[].secret' $TEMP_DIR/reports/alerts.json > $TEMP_DIR/reports/exact_secrets.txt || echo "" > $TEMP_DIR/reports/exact_secrets.txt
@@ -120,9 +123,10 @@ jobs:
           gh issue close ${{ github.event.issue.number }}
 
       - name: Restore branch protection
+        env:
+          REPO: ${{ steps.parse.outputs.gh_repo }}
+          ORG: ${{ steps.parse.outputs.gh_org }}
         run: |
-          ORG=${{ steps.setup.outputs.gh_org }}
-          REPO=${{ steps.setup.outputs.gh_repo }}
           DEFAULT_BRANCH=$(gh api "/repos/$ORG/$REPO" | jq -r '.default_branch')
           PROTECTION=$(cat $TEMP_DIR/branch_protection.json)
           if [ "$PROTECTION" != "{}" ]; then
