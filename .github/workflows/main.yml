@@ -276,7 +276,7 @@ jobs:
           while IFS=: read -r file line; do
             if [ -f "$file" ]; then
               echo "Modifying $file:$line"
-              sed -i "${line}s|\"[^\"]*REMOVED[^\"]*\"|\"***REMOVED***user:***REMOVED***@redacted\"|g" "$file"
+              sed -i "${line}s|\"[^\"]****REMOVED***user:***REMOVED***@redacted[^\"]*\"|\"***REMOVED***user:***REMOVED***@redacted\"|g" "$file"
             else
               echo "⚠️ File not found: $file"
             fi
@@ -289,13 +289,13 @@ jobs:
           echo "Checking workflow files for secrets..."
           find .github/workflows -type f -name "*.yml" | while read -r file; do
             echo "Processing $file"
-            sed -i 's|[a-zA-Z0-9._-]*REMOVED[a-zA-Z0-9._-]*|***REMOVED***user:***REMOVED***@redacted|g' "$file"
+            sed -i 's|[a-zA-Z0-9._-]****REMOVED***user:***REMOVED***@redacted[a-zA-Z0-9._-]*|***REMOVED***user:***REMOVED***@redacted|g' "$file"
           done
         
           # Special case for poc.json
           if [ -f "poc.json" ]; then
             echo "Processing poc.json"
-            sed -i 's|".*REMOVED.*"|"***REMOVED***user:***REMOVED***@redacted"|g' poc.json
+            sed -i 's|".****REMOVED***user:***REMOVED***@redacted*"|"***REMOVED***user:***REMOVED***@redacted"|g' poc.json
             sed -i 's|"[^"]*"[[:space:]]*:[[:space:]]*"[^"]*"|"***REMOVED***": "REDACTED"|g' poc.json
           fi
         
