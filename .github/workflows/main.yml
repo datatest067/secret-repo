@@ -74,6 +74,7 @@ jobs:
         run: |
           BACKUP_DIR="$TEMP_DIR/backup-$REPO"
           echo $BACKUP_DIR
+          mkdir -p "$BACKUP_DIR"
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
           git clone --mirror "https://$PAT_TOKEN@github.com/$ORG/$REPO.git" "$BACKUP_DIR/repo"
