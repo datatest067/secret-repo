@@ -67,6 +67,14 @@ jobs:
           gh api "/repos/$ORG/$REPO/branches/$DEFAULT_BRANCH/protection" > $TEMP_DIR/branch_protection.json || echo '{}' > $TEMP_DIR/branch_protection.json
           curl -s -X DELETE -H "Authorization: token $PAT_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$ORG/$REPO/branches/$DEFAULT_BRANCH/protection"
 
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.parse.outputs.gh_org }}/${{ steps.parse.outputs.gh_repo }}
+          token: ${{ secrets.PAT_TOKEN }}
+          fetch-depth: 0
+          fetch-tags: true
+          
       - name: Clone repo & backup
         env:
           REPO: ${{ steps.parse.outputs.gh_repo }}
@@ -84,8 +92,8 @@ jobs:
       - name: Upload backup
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.setup.outputs.gh_repo }}-backup
-          path: ${{ env.TEMP_DIR }}/artifacts/${{ steps.setup.outputs.gh_repo }}-backup.zip
+          name: ${{ steps.parse.outputs.gh_repo }}-backup
+          path: ${{ env.TEMP_DIR }}/artifacts/${{ steps.parse.outputs.gh_repo }}-backup.zip
 
       - name: Secret scanning report
         env:
