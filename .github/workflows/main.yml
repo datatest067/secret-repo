@@ -118,13 +118,28 @@ jobs:
 
       - name: Secret scanning report
         env:
-          REPO: ${{ steps.parse.outputs.gh_repo }}
-          ORG: ${{ steps.parse.outputs.gh_org }}
+          GH_REPO: ${{ steps.parse.outputs.gh_repo }}
+          GH_ORG: ${{ steps.parse.outputs.gh_org }}
         run: |
+          # Authenticate with GitHub CLI
+          echo "$PAT_TOKEN" | gh auth login --with-token
+          
           mkdir -p $TEMP_DIR/reports
-          gh api "/repos/$ORG/$REPO/secret-scanning/alerts?state=open&per_page=100" > $TEMP_DIR/reports/alerts.json || echo "[]" > $TEMP_DIR/reports/alerts.json
-          jq -r '.[].secret' $TEMP_DIR/reports/alerts.json > $TEMP_DIR/reports/exact_secrets.txt || echo "" > $TEMP_DIR/reports/exact_secrets.txt
-
+          gh api \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/$GH_ORG/$GH_REPO/secret-scanning/alerts?state=open&per_page=100" > $TEMP_DIR/reports/all_alerts.json || echo "[]" > $TEMP_DIR/reports/all_alerts.json
+          
+          # Specifically get generic alerts
+          echo "Fetching generic alerts..."
+          gh api \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/$GH_ORG/$GH_REPO/secret-scanning/alerts?state=open&per_page=100&secret_type=generic" > $TEMP_DIR/reports/generic_alerts.json || echo "[]" > $TEMP_DIR/reports/generic_alerts.json
+          
+                    # Specifically get ***REMOVED*** alerts
+          echo "Fetching ***REMOVED*** alerts..."
+          gh api \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/$GH_ORG/$GH_REPO/secret-scanning/alerts?state=open&per_page=100&secret_type=***REMOVED***" > $TEMP_DIR/reports/***REMOVED***_alerts.json || echo "[]" > $TEMP_DIR/reports/***REMOVED***_alerts.json
       - name: Upload secret report
         uses: actions/upload-artifact@v4
         with:
