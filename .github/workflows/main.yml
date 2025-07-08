@@ -277,8 +277,8 @@ jobs:
               if [ -f "$file" ]; then
                 echo "Processing $file:$line"
           
-                # Replace line containing REMOVED marker with redacted pattern
-                sed -i "${line}s|\"[^\"]*REMOVED[^\"]*\"|\"***REMOVED***user:***REMOVED***@redacted\"|g" "$file"
+                # Replace line containing ***REMOVED***user:***REMOVED***@redacted marker with redacted pattern
+                sed -i "${line}s|\"[^\"]****REMOVED***user:***REMOVED***@redacted[^\"]*\"|\"***REMOVED***user:***REMOVED***@redacted\"|g" "$file"
           
                 echo "✅ Modified $file"
               else
@@ -295,7 +295,7 @@ jobs:
             echo "Processing workflow file: $file"
           
             # Replace secret-looking patterns
-            sed -i 's|[a-zA-Z0-9._-]*REMOVED[a-zA-Z0-9._-]*|***REMOVED***user:***REMOVED***@redacted|g' "$file"
+            sed -i 's|[a-zA-Z0-9._-]****REMOVED***user:***REMOVED***@redacted[a-zA-Z0-9._-]*|***REMOVED***user:***REMOVED***@redacted|g' "$file"
           
             echo "✅ Processed workflow file: $file"
           done
@@ -304,7 +304,7 @@ jobs:
           if [ -f "poc.json" ]; then
             echo "Processing poc.json..."
           
-            sed -i 's|".*REMOVED.*"|"***REMOVED***user:***REMOVED***@redacted"|g' poc.json
+            sed -i 's|".****REMOVED***user:***REMOVED***@redacted*"|"***REMOVED***user:***REMOVED***@redacted"|g' poc.json
             sed -i 's|"[^"]*"[[:space:]]*:[[:space:]]*"[^"]*"|"***REMOVED***": "REDACTED"|g' poc.json
           
             echo "✅ Processed poc.json"
