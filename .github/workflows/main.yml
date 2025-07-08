@@ -22,6 +22,7 @@ jobs:
       - name: Parse form inputs from issue body
         id: parse
         run: |
+          echo $TOKEN
           echo "🔍 Raw ISSUE_BODY:"
           echo "${{ github.event.issue.body }}"
           echo "------------------------------"
