@@ -269,50 +269,44 @@ jobs:
         run: |
           echo "🔧 Directly modifying files with secrets..."
           
-          # Check if we have file locations
+          echo "🔍 Scanning for hardcoded secrets..."
+          
+          mkdir -p "$TEMP_DIR/reports"
+          
+          # Basic secret scan
+          grep -rEn --exclude-dir={.git,.github} "(password|api[_-]?key|token|secret)[\"':= ]+[^\"'\s]+" . > "$TEMP_DIR/reports/file_locations.txt"
+          
           if [ -s "$TEMP_DIR/reports/file_locations.txt" ]; then
-            echo "Found $(wc -l < "$TEMP_DIR/reports/file_locations.txt") file locations"
-          
-            while IFS=: read -r file line; do
+            echo "Found $(wc -l < $TEMP_DIR/reports/file_locations.txt) secret entries"
+            
+            # Modify matching lines
+            cat "$TEMP_DIR/reports/file_locations.txt" | while IFS=: read -r file line content; do
               if [ -f "$file" ]; then
-                echo "Processing $file:$line"
-          
-                # Replace line containing ***REMOVED***user:***REMOVED***@redacted marker with redacted pattern
-                sed -i "${line}s|\"[^\"]****REMOVED***user:***REMOVED***@redacted[^\"]*\"|\"***REMOVED***user:***REMOVED***@redacted\"|g" "$file"
-          
-                echo "✅ Modified $file"
-              else
-                echo "⚠️ File not found: $file"
+                echo "Sanitizing $file:$line"
+                sed -i "${line}s/\(password\|api[_-]\?key\|token\|secret\)[\"':= ]\{1,\}[\"']\?[^\"' ]\{6,\}/REDACTED_SECRET/gI" "$file"
               fi
-            done < "$TEMP_DIR/reports/file_locations.txt"
+            done
           else
-            echo "No file locations found"
+            echo "No secrets found"
           fi
           
-          # Special handling for workflow files
-          echo "Checking workflow files for secrets..."
+          # Always scan .github workflows
+          echo "🔧 Checking .github/workflows/*.yml"
           find .github/workflows -type f -name "*.yml" | while read -r file; do
-            echo "Processing workflow file: $file"
-          
-            # Replace secret-looking patterns
-            sed -i 's|[a-zA-Z0-9._-]****REMOVED***user:***REMOVED***@redacted[a-zA-Z0-9._-]*|***REMOVED***user:***REMOVED***@redacted|g' "$file"
-          
-            echo "✅ Processed workflow file: $file"
+            echo "Sanitizing workflow: $file"
+            sed -Ei 's/([Pp]assword|[Ss]ecret|[Tt]oken|[Kk]ey)[[:space:]]*[:=][[:space:]]*["'"'"']?[^"'"\s]+["'"'"']?/REDACTED_SECRET/g' "$file"
           done
           
-          # Special case for poc.json
+          # Optionally scan known sensitive files like poc.json
           if [ -f "poc.json" ]; then
-            echo "Processing poc.json..."
-          
-            sed -i 's|".****REMOVED***user:***REMOVED***@redacted*"|"***REMOVED***user:***REMOVED***@redacted"|g' poc.json
-            sed -i 's|"[^"]*"[[:space:]]*:[[:space:]]*"[^"]*"|"***REMOVED***": "REDACTED"|g' poc.json
-          
-            echo "✅ Processed poc.json"
+            echo "Sanitizing poc.json"
+            sed -Ei 's|"([Pp]assword|[Ss]ecret|[Tt]oken|[Kk]ey)"[[:space:]]*:[[:space:]]*"[^"]+"|"REDACTED_KEY": "REDACTED_SECRET"|g' poc.json
           fi
           
-          # Commit the changes
+          # Commit changes
           git add .
-          git commit -m "Remove secrets from files" || echo "No changes to commit"
+          git commit -m "🚫 Removed hardcoded secrets" || echo "No secrets to commit"
+
 
       # Step 10: Purge secrets using BFG with enhanced ***REMOVED*** patterns
       - name: Purge secrets using BFG
