@@ -75,19 +75,38 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
           
-      - name: Clone repo & backup
+     # Step 4: Create full repository backup
+      - name: Create repository backup
         env:
-          REPO: ${{ steps.parse.outputs.gh_repo }}
-          ORG: ${{ steps.parse.outputs.gh_org }}
+          GH_REPO: ${{ steps.parse.outputs.gh_repo }}
+          GH_ORG: ${{ steps.parse.outputs.gh_org }}
         run: |
-          BACKUP_DIR="$TEMP_DIR/backup-$REPO"
-          echo $BACKUP_DIR
+          echo "📦 Creating repository backup..."
+          
+          # Create a backup directory in the temp directory
+          BACKUP_DIR="$TEMP_DIR/backup-$GH_REPO"
           mkdir -p "$BACKUP_DIR"
+          
+          # Configure Git
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
-          git clone --mirror "https://$PAT_TOKEN@github.com/$ORG/$REPO.git" "$BACKUP_DIR/repo"
-          rm -f "$BACKUP_DIR/repo/config" && touch "$BACKUP_DIR/repo/config"
-          zip -r "$TEMP_DIR/artifacts/$REPO-backup.zip" "$BACKUP_DIR"
+          
+          # Clone the repository with all branches and tags as a mirror
+          git clone --mirror "https://$PAT_TOKEN@github.com/$GH_ORG/$GH_REPO.git" "$BACKUP_DIR/repo"
+          
+          # Remove .git/config file which might contain tokens
+          rm -f "$BACKUP_DIR/repo/config"
+          touch "$BACKUP_DIR/repo/config"
+          
+          # Create a zip archive of the backup
+          cd $TEMP_DIR
+          zip -r "$GH_REPO-backup.zip" "backup-$GH_REPO"
+          
+          # Create artifacts directory
+          mkdir -p $TEMP_DIR/artifacts
+          mv "$GH_REPO-backup.zip" $TEMP_DIR/artifacts/
+          
+          echo "✅ Repository backup created: $TEMP_DIR/artifacts/$GH_REPO-backup.zip"
 
       - name: Upload backup
         uses: actions/upload-artifact@v4
