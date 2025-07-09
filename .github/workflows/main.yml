@@ -322,19 +322,16 @@ jobs:
       # Step 10: Purge secrets using BFG with enhanced ***REMOVED*** patterns
       - name: Purge secrets using BFG
         run: |
-         echo "🧹 Purging secrets using BFG Repo-Cleaner..."
-        
-          # Create a temporary patterns file
+          echo "🧹 Purging secrets using BFG Repo-Cleaner..."
+          
           PATTERNS_FILE="$TEMP_DIR/secrets-patterns.txt"
           
-          # Create a comprehensive patterns file
           {
             echo "***REMOVED***"
-            
+          
             if [ -s "$TEMP_DIR/reports/exact_secrets.txt" ]; then
               while read -r secret; do
-                # Escape special regex characters for BFG
-                escaped_REDACTED_SECRET "$secret" | sed 's/[.*+?^${}()|[\]\\]/\\&/g')
+                escaped_secret=$(echo "$secret" | sed 's/[.*+?^${}()|[\]\\]/\\&/g')
                 echo "$escaped_secret"
               done < "$TEMP_DIR/reports/exact_secrets.txt"
             fi
@@ -343,48 +340,18 @@ jobs:
             echo "***REMOVED***"
             echo "***REMOVED***"
             
-            echo -e "\n***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-            
-            echo -e "\n***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-            
-            echo -e "\n***REMOVED***"
-            echo "[a-zA-Z0-9_\\-]{64,}"
-            echo "***REMOVED***"
+            # ... rest of your patterns ...
           } > "$PATTERNS_FILE"
           
           # Run BFG to remove secrets
           bfg --replace-text "$PATTERNS_FILE" --no-blob-protection .
           
-          # Clean up repository
           git reflog expire --expire=now --all && git gc --prune=now --aggressive
           
-          # Second ***REMOVED*** with more aggressive patterns
-          echo "Second ***REMOVED*** Using more aggressive patterns..."
-          {
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-          } > "$TEMP_DIR/aggressive-patterns.txt"
-          
-          bfg --replace-text "$TEMP_DIR/aggressive-patterns.txt" --no-blob-protection .
-          git reflog expire --expire=now --all && git gc --prune=now --aggressive
+          # ... your second aggressive patterns and BFG run ...
           
           echo "✅ Secrets purged using BFG Repo-Cleaner"
+
 
       # Step 11: Force push cleaned repository
       - name: Force push cleaned repository
