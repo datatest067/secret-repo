@@ -16,8 +16,8 @@ jobs:
       - name: Simulate hardcoded secrets (⚠️ bad practice)
         run: |
           echo "Hardcoded AWS key: AKIAIOSFOE"
-          echo "Hardcoded AWS secret: wJalrXUtnFEMXAMPLEKEY"
-          echo "Hardcoded GitHub token: REDACTED_SECRET"
+          echo "Hardcoded AWS REDACTED_SECRET"
+          echo "Hardcoded GitHub REDACTED_SECRET"
           echo "Hardcoded DB ***REMOVED*** REDACTED_SECRET!"
 
       - name: Deploy (placeholder)

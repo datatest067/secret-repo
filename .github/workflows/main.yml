@@ -1,4 +1,4 @@
-name: Secret Removal
+name: REDACTED_SECRET
 on:
   issues:
     types: [opened]
@@ -81,7 +81,7 @@ jobs:
           # Disable branch protection
           echo "Disabling branch protection..."
           curl -s -X DELETE \
-            -H "Authorization: token $PAT_TOKEN" \
+            -H "Authorization: REDACTED_SECRET" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/$GH_ORG/$GH_REPO/branches/$DEFAULT_BRANCH/protection" || echo "Failed to disable branch protection"
           
@@ -152,8 +152,8 @@ jobs:
           echo -e '#!/bin/bash\njava -jar '$TEMP_DIR'/bfg.jar "$@"' > $TEMP_DIR/bfg
           chmod +x $TEMP_DIR/bfg
           sudo mv $TEMP_DIR/bfg /usr/local/bin/bfg
-      # Step 7: Get ALL secret scanning alerts
-      - name: Get ALL secret scanning alerts
+      # Step 7: Get ALL REDACTED_SECRET alerts
+      - name: Get ALL REDACTED_SECRET alerts
         id: secrets_report
         env:
           GH_REPO: ${{ steps.parse.outputs.gh_repo }}
@@ -167,7 +167,7 @@ jobs:
           mkdir -p $TEMP_DIR/artifacts
           
           # Get all alerts without filtering
-          echo "Fetching all secret scanning alerts..."
+          echo "Fetching all REDACTED_SECRET alerts..."
           gh api \
             -H "Accept: application/vnd.github+json" \
             "/repos/$GH_ORG/$GH_REPO/secret-scanning/alerts?state=open&per_page=100" > $TEMP_DIR/reports/all_alerts.json || echo "[]" > $TEMP_DIR/reports/all_alerts.json
@@ -195,11 +195,11 @@ jobs:
           jq -r '.[] | select(.location != null) | .location.path + ":" + (.location.start_line | tostring)' $TEMP_DIR/reports/alerts.json > $TEMP_DIR/reports/file_locations.txt || echo "" > $TEMP_DIR/reports/file_locations.txt
           
           # Create a file with exact secrets (for BFG)
-          jq -r '.[] | .secret' $TEMP_DIR/reports/alerts.json > $TEMP_DIR/reports/exact_secrets.txt || echo "" > $TEMP_DIR/reports/exact_secrets.txt
+          jq -r '.[] | .REDACTED_SECRET > $TEMP_DIR/reports/exact_secrets.txt || echo "" > $TEMP_DIR/reports/exact_secrets.txt
           
           # Create a detailed report of detected secrets
           {
-            echo "# Secret Scanning Report"
+            echo "# REDACTED_SECRET Report"
             echo "## Repository: $GH_ORG/$GH_REPO"
             echo "## Date: $(date '+%Y-%m-%d %H:%M:%S')"
             echo ""
@@ -216,18 +216,18 @@ jobs:
             fi
             
             echo ""
-            echo "## Secret Locations"
+            echo "## REDACTED_SECRET"
             echo ""
             
             # List locations without showing actual secrets
             if [ -s $TEMP_DIR/reports/alerts.json ] && [ "$(cat $TEMP_DIR/reports/alerts.json)" != "[]" ]; then
               jq -r '.[] | "- *" + .secret_type + "* found in [" + .html_url + "](" + .html_url + ")"' $TEMP_DIR/reports/alerts.json
             else
-              echo "No secret locations detected."
+              echo "No REDACTED_SECRET detected."
             fi
             
             echo ""
-            echo "## Secret Details (Masked)"
+            echo "## REDACTED_SECRET (Masked)"
             echo ""
             echo "| Type | First 4 chars | Last 4 chars | File Path |"
             echo "| ---- | ------------- | ------------ | --------- |"
@@ -277,7 +277,7 @@ jobs:
           grep -rEn --exclude-dir={.git,.github} "(password|api[_-]?key|token|secret)[\"':= ]+[^\"'\s]+" . > "$TEMP_DIR/reports/file_locations.txt"
           
           if [ -s "$TEMP_DIR/reports/file_locations.txt" ]; then
-            echo "Found $(wc -l < $TEMP_DIR/reports/file_locations.txt) secret entries"
+            echo "Found $(wc -l < $TEMP_DIR/reports/file_locations.txt) REDACTED_SECRET"
             
             # Modify matching lines
             cat "$TEMP_DIR/reports/file_locations.txt" | while IFS=: read -r file line content; do
@@ -323,7 +323,7 @@ jobs:
             if [ -s $TEMP_DIR/reports/exact_secrets.txt ]; then
               cat $TEMP_DIR/reports/exact_secrets.txt | while read -r secret; do
                 # Escape special characters for regex
-                escaped_secret=$(echo "$secret" | sed 's/[.*+?^${}()|[\]\\]/\\&/g')
+                escaped_REDACTED_SECRET "$secret" | sed 's/[.*+?^${}()|[\]\\]/\\&/g')
                 echo "$escaped_secret"
               done
             fi
@@ -392,13 +392,13 @@ jobs:
           git push origin --tags --force
           
           echo "✅ Repository pushed successfully"
-      # Step 12: Handle secret scanning alerts (with delegated dismissal support)
-      - name: Handle secret scanning alerts
+      # Step 12: Handle REDACTED_SECRET alerts (with delegated dismissal support)
+      - name: Handle REDACTED_SECRET alerts
         env:
           GH_REPO: ${{ steps.parse.outputs.gh_repo }}
           GH_ORG: ${{ steps.parse.outputs.gh_org }}
         run: |
-          echo "🔒 Handling secret scanning alerts..."
+          echo "🔒 Handling REDACTED_SECRET alerts..."
           
           # Create artifacts directory if it doesn't exist
           mkdir -p $TEMP_DIR/artifacts
@@ -407,7 +407,7 @@ jobs:
           if [ -s "$TEMP_DIR/reports/alert_numbers.txt" ]; then
             # Create a report of alerts that need manual dismissal
             {
-              echo "# Secret Scanning Alerts Requiring Manual Dismissal"
+              echo "# REDACTED_SECRET Alerts Requiring Manual Dismissal"
               echo "## Repository: $GH_ORG/$GH_REPO"
               echo "## Date: $(date '+%Y-%m-%d %H:%M:%S')"
               echo ""
@@ -437,10 +437,10 @@ jobs:
             done
           else
             echo "No alert numbers found"
-            echo "# No Secret Scanning Alerts Found" > $TEMP_DIR/artifacts/alerts_to_dismiss.md
+            echo "# No REDACTED_SECRET Alerts Found" > $TEMP_DIR/artifacts/alerts_to_dismiss.md
           fi
           
-          echo "✅ Secret scanning alerts handled"
+          echo "✅ REDACTED_SECRET alerts handled"
       # Step 13: Upload alerts to dismiss report
       - name: Upload alerts to dismiss report
         uses: actions/upload-artifact@v4
@@ -500,7 +500,7 @@ jobs:
             # Apply branch protection
             echo "Applying branch protection settings..."
             echo "$PROTECTION_PAYLOAD" | curl -s -X PUT \
-              -H "Authorization: token $PAT_TOKEN" \
+              -H "Authorization: REDACTED_SECRET" \
               -H "Accept: application/vnd.github+json" \
               -d @- \
               "https://api.github.com/repos/$GH_ORG/$GH_REPO/branches/$DEFAULT_BRANCH/protection" || echo "Failed to restore branch protection"
@@ -520,18 +520,18 @@ jobs:
           echo "📝 Commenting on issue with completion status..."
           
           # Create the comment body
-          COMMENT="## 🎉 Secret Removal Process Completed\n\nThe secret removal process has been completed for repository *${GH_ORG}/${GH_REPO}.\n\n### Summary:\n- ✅ Repository backup created and saved as workflow artifacts (retained for 30 days)\n- ✅ Secrets detected and purged from repository history\n- ✅ Repository history has been cleaned and force pushed\n- ⚠️ Secret scanning alerts need manual dismissal (see alerts-to-dismiss artifact)\n- ✅ Branch protection rules have been restored\n\n### Artifacts:\n- **secrets-detected-report: Contains a masked summary of detected secrets\n- **alerts-to-dismiss: Contains a list of alerts that need manual dismissal\n\n### Next Steps:\n1. Download the backup artifact from the workflow run if needed\n2. Manually dismiss the secret scanning alerts (see alerts-to-dismiss artifact)\n3. Notify collaborators to update their local repositories (git fetch --all and git reset --hard origin/main)\n4. Verify that secrets have been properly \n5. **Important:* Revoke and rotate any exposed credentials immediately\n\nThank you for using the Secret Removal Automation tool!"
+          COMMENT="## 🎉 REDACTED_SECRET Process Completed\n\nThe REDACTED_SECRET process has been completed for repository *${GH_ORG}/${GH_REPO}.\n\n### Summary:\n- ✅ Repository backup created and saved as workflow artifacts (retained for 30 days)\n- ✅ Secrets detected and purged from repository history\n- ✅ Repository history has been cleaned and force pushed\n- ⚠️ REDACTED_SECRET alerts need manual dismissal (see alerts-to-dismiss artifact)\n- ✅ Branch protection rules have been restored\n\n### Artifacts:\n- **secrets-detected-report: Contains a masked summary of detected secrets\n- **alerts-to-dismiss: Contains a list of alerts that need manual dismissal\n\n### Next Steps:\n1. Download the backup artifact from the workflow run if needed\n2. Manually dismiss the REDACTED_SECRET alerts (see alerts-to-dismiss artifact)\n3. Notify collaborators to update their local repositories (git fetch --all and git reset --hard origin/main)\n4. Verify that secrets have been properly \n5. **Important:* Revoke and rotate any exposed credentials immediately\n\nThank you for using the REDACTED_SECRET Automation tool!"
           
           # Post comment to the issue
           curl -s -X POST \
-            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Authorization: REDACTED_SECRET" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${{ github.repository }}/issues/$ISSUE_NUMBER/comments" \
             -d "{\"body\": $(echo "$COMMENT" | jq -s -R .)}"
           
           # Close the issue
           curl -s -X PATCH \
-            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Authorization: REDACTED_SECRET" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${{ github.repository }}/issues/$ISSUE_NUMBER" \
             -d '{"state": "closed"}'
