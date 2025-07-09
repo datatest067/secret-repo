@@ -20,8 +20,10 @@ jobs:
       - name: Parse issue inputs
         id: parse
         run: |
-          echo "gh_repo=secret-repo" >> $GITHUB_OUTPUT
-          echo "gh_org=datatest067" >> $GITHUB_OUTPUT
+          GH_REPO=$(echo "${{ github.event.issue.body }}" | grep -i '^repo:' | cut -d':' -f2 | xargs)
+          GH_ORG=$(echo "${{ github.event.issue.body }}" | grep -i '^org:' | cut -d':' -f2 | xargs)
+          echo "gh_repo=$GH_REPO" >> $GITHUB_OUTPUT
+          echo "gh_org=$GH_ORG" >> $GITHUB_OUTPUT
           mkdir -p $TEMP_DIR/artifacts
 
       - name: Disable branch protection
@@ -32,14 +34,16 @@ jobs:
           curl -s -X DELETE -H "Authorization: token $PAT_TOKEN" -H "Accept: application/vnd.github+json" https://api.github.com/repos/${{ steps.parse.outputs.gh_org }}/${{ steps.parse.outputs.gh_repo }}/branches/$DEFAULT_BRANCH/protection
 
       - name: Backup repository
+        id: backup
         env:
           GH_REPO: ${{ steps.parse.outputs.gh_repo }}
           GH_ORG: ${{ steps.parse.outputs.gh_org }}
         run: |
-          BACKUP_DIR="$TEMP_DIR/backup"
+          BACKUP_DIR="$TEMP_DIR/backup-${GH_REPO}/repo"
           git clone --mirror "https://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@github.com/${GH_ORG}/${GH_REPO}.git" "$BACKUP_DIR"
           rm -f "$BACKUP_DIR/config" && touch "$BACKUP_DIR/config"
           zip -r "$TEMP_DIR/artifacts/${GH_REPO}-backup.zip" "$BACKUP_DIR"
+          echo "repo_mirror=$BACKUP_DIR" >> $GITHUB_OUTPUT
 
       - name: Upload backup
         uses: actions/upload-artifact@v4
@@ -80,23 +84,21 @@ jobs:
           fi
 
       - name: Run BFG
+        env:
+          GH_REPO: ${{ steps.parse.outputs.gh_repo }}
+          REPO_MIRROR: ${{ steps.backup.outputs.repo_mirror }}
         run: |
-          REPO_MIRROR="$TEMP_DIR/backup-${GH_REPO}/repo"
           PATTERN_FILE="$TEMP_DIR/bfg_patterns.txt"
-          
           echo "***REMOVED***" > "$PATTERN_FILE"
           cat "$TEMP_DIR/reports/secrets.txt" >> "$PATTERN_FILE"
-          
-          # BFG needs to run inside the mirror repo directory
           cd "$REPO_MIRROR"
-          
           bfg --replace-text "$PATTERN_FILE" --no-blob-protection .
-          
           git reflog expire --expire=now --all
           git gc --prune=now --aggressive
 
       - name: Push cleaned repo
         run: |
+          cd "${{ steps.backup.outputs.repo_mirror }}"
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git push origin --force --all
@@ -124,7 +126,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          COMMENT="Secrets removed, repo cleaned. Please review artifacts."
+          COMMENT="✅ Secrets removed, repository cleaned. Backup and report are available as artifacts."
           curl -s -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
