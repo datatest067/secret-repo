@@ -354,7 +354,7 @@ jobs:
             if [ -s $TEMP_DIR/reports/exact_secrets.txt ]; then
               cat $TEMP_DIR/reports/exact_secrets.txt | while read -r secret; do
                 # Escape special characters for regex
-                escaped_REDACTED_SECRET "$secret" | sed 's/[.*+?^${}()|[\]\\]/\\&/g')
+                escaped_REDACTED_REDACTED_SECRET" | sed 's/[.*+?^${}()|[\]\\]/\\&/g')
                 echo "$escaped_secret"
               done
             fi

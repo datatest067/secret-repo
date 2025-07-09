@@ -157,8 +157,8 @@ jobs:
           echo -e '#!/bin/bash\njava -jar '$TEMP_DIR'/bfg.jar "$@"' > $TEMP_DIR/bfg
           chmod +x $TEMP_DIR/bfg
           sudo mv $TEMP_DIR/bfg /usr/local/bin/bfg
-      # Step 7: Get ALL REDACTED_SECRET alerts
-      - name: Get ALL REDACTED_SECRET alerts
+      # Step 7: Get ALL REDACTED_REDACTED_SECRET
+      - name: Get ALL REDACTED_REDACTED_SECRET
         id: secrets_report
         env:
           GH_REPO: ${{ steps.parse.outputs.gh_repo }}
@@ -172,19 +172,19 @@ jobs:
           mkdir -p "$TEMP_DIR/reports"
           mkdir -p "$TEMP_DIR/artifacts"
           
-          # Fetch all open secret scanning alerts
-          echo "Fetching all REDACTED_SECRET alerts..."
+          # Fetch all open REDACTED_SECRET alerts
+          echo "Fetching all REDACTED_REDACTED_SECRET"
           gh api \
             -H "Accept: application/vnd.github+json" \
             "/repos/$GH_ORG/$GH_REPO/secret-scanning/alerts?state=open&per_page=100" > "$TEMP_DIR/reports/all_alerts.json" || echo "[]" > "$TEMP_DIR/reports/all_alerts.json"
           
-          # Fetch generic secret alerts
+          # Fetch generic REDACTED_SECRET
           echo "Fetching generic alerts..."
           gh api \
             -H "Accept: application/vnd.github+json" \
             "/repos/$GH_ORG/$GH_REPO/secret-scanning/alerts?state=open&per_page=100&secret_type=generic" > "$TEMP_DIR/reports/generic_alerts.json" || echo "[]" > "$TEMP_DIR/reports/generic_alerts.json"
           
-          # Fetch ***REMOVED*** secret alerts
+          # Fetch ***REMOVED*** REDACTED_SECRET
           echo "Fetching ***REMOVED*** alerts..."
           gh api \
             -H "Accept: application/vnd.github+json" \
@@ -207,11 +207,11 @@ jobs:
           jq -r '.[] | select(.location != null) | .location.path + ":" + (.location.start_line | tostring)' "$TEMP_DIR/reports/alerts.json" > "$TEMP_DIR/reports/file_locations.txt" || echo "" > "$TEMP_DIR/reports/file_locations.txt"
           
           # Create a file with exact secrets for further processing (like BFG)
-          jq -r '.[] | .secret' "$TEMP_DIR/reports/alerts.json" > "$TEMP_DIR/reports/exact_secrets.txt" || echo "" > "$TEMP_DIR/reports/exact_secrets.txt"
+          jq -r '.[] | .REDACTED_SECRET" > "$TEMP_DIR/reports/exact_secrets.txt" || echo "" > "$TEMP_DIR/reports/exact_secrets.txt"
           
           # Create a detailed markdown report
           {
-            echo "# REDACTED_SECRET Report"
+            echo "# REDACTED_REDACTED_SECRET"
             echo "## Repository: $GH_ORG/$GH_REPO"
             echo "## Date: $(date '+%Y-%m-%d %H:%M:%S')"
             echo ""
@@ -233,11 +233,11 @@ jobs:
             if [ -s "$TEMP_DIR/reports/alerts.json" ] && [ "$(cat "$TEMP_DIR/reports/alerts.json")" != "[]" ]; then
               jq -r '.[] | "- *" + .secret_type + "* found in [" + .html_url + "](" + .html_url + ")"' "$TEMP_DIR/reports/alerts.json"
             else
-              echo "No REDACTED_SECRET detected."
+              echo "No REDACTED_REDACTED_SECRET"
             fi
           
             echo ""
-            echo "## REDACTED_SECRET (Masked)"
+            echo "## REDACTED_REDACTED_SECRET"
             echo ""
             echo "| Type | Masked Secret | File Path |"
             echo "| ---- | ------------- | --------- |"
@@ -334,7 +334,7 @@ jobs:
             if [ -s "$TEMP_DIR/reports/exact_secrets.txt" ]; then
               while read -r secret; do
                 # Escape special regex characters for BFG
-                escaped_secret=$(echo "$secret" | sed 's/[.*+?^${}()|[\]\\]/\\&/g')
+                escaped_REDACTED_SECRET "$secret" | sed 's/[.*+?^${}()|[\]\\]/\\&/g')
                 echo "$escaped_secret"
               done < "$TEMP_DIR/reports/exact_secrets.txt"
             fi
@@ -404,13 +404,13 @@ jobs:
           git push origin --tags --force
           
           echo "✅ Repository pushed successfully"
-      # Step 12: Handle REDACTED_SECRET alerts (with delegated dismissal support)
-      - name: Handle REDACTED_SECRET alerts
+      # Step 12: Handle REDACTED_REDACTED_SECRET (with delegated dismissal support)
+      - name: Handle REDACTED_REDACTED_SECRET
         env:
           GH_REPO: ${{ steps.parse.outputs.gh_repo }}
           GH_ORG: ${{ steps.parse.outputs.gh_org }}
         run: |
-          echo "🔒 Handling REDACTED_SECRET alerts..."
+          echo "🔒 Handling REDACTED_REDACTED_SECRET"
           
           # Create artifacts directory if it doesn't exist
           mkdir -p $TEMP_DIR/artifacts
@@ -419,7 +419,7 @@ jobs:
           if [ -s "$TEMP_DIR/reports/alert_numbers.txt" ]; then
             # Create a report of alerts that need manual dismissal
             {
-              echo "# REDACTED_SECRET Alerts Requiring Manual Dismissal"
+              echo "# REDACTED_REDACTED_SECRET Requiring Manual Dismissal"
               echo "## Repository: $GH_ORG/$GH_REPO"
               echo "## Date: $(date '+%Y-%m-%d %H:%M:%S')"
               echo ""
@@ -449,10 +449,10 @@ jobs:
             done
           else
             echo "No alert numbers found"
-            echo "# No REDACTED_SECRET Alerts Found" > $TEMP_DIR/artifacts/alerts_to_dismiss.md
+            echo "# No REDACTED_REDACTED_SECRET Found" > $TEMP_DIR/artifacts/alerts_to_dismiss.md
           fi
           
-          echo "✅ REDACTED_SECRET alerts handled"
+          echo "✅ REDACTED_REDACTED_SECRET handled"
       # Step 13: Upload alerts to dismiss report
       - name: Upload alerts to dismiss report
         uses: actions/upload-artifact@v4
@@ -532,7 +532,7 @@ jobs:
           echo "📝 Commenting on issue with completion status..."
           
           # Create the comment body
-          COMMENT="## 🎉 REDACTED_SECRET Process Completed\n\nThe REDACTED_SECRET process has been completed for repository *${GH_ORG}/${GH_REPO}.\n\n### Summary:\n- ✅ Repository backup created and saved as workflow artifacts (retained for 30 days)\n- ✅ Secrets detected and purged from repository history\n- ✅ Repository history has been cleaned and force pushed\n- ⚠️ REDACTED_SECRET alerts need manual dismissal (see alerts-to-dismiss artifact)\n- ✅ Branch protection rules have been restored\n\n### Artifacts:\n- **secrets-detected-report: Contains a masked summary of detected secrets\n- **alerts-to-dismiss: Contains a list of alerts that need manual dismissal\n\n### Next Steps:\n1. Download the backup artifact from the workflow run if needed\n2. Manually dismiss the REDACTED_SECRET alerts (see alerts-to-dismiss artifact)\n3. Notify collaborators to update their local repositories (git fetch --all and git reset --hard origin/main)\n4. Verify that secrets have been properly \n5. **Important:* Revoke and rotate any exposed credentials immediately\n\nThank you for using the REDACTED_SECRET Automation tool!"
+          COMMENT="## 🎉 REDACTED_REDACTED_SECRET Completed\n\nThe REDACTED_REDACTED_SECRET has been completed for repository *${GH_ORG}/${GH_REPO}.\n\n### Summary:\n- ✅ Repository backup created and saved as workflow artifacts (retained for 30 days)\n- ✅ Secrets detected and purged from repository history\n- ✅ Repository history has been cleaned and force pushed\n- ⚠️ REDACTED_REDACTED_SECRET need manual dismissal (see alerts-to-dismiss artifact)\n- ✅ Branch protection rules have been restored\n\n### Artifacts:\n- **secrets-detected-report: Contains a masked summary of detected secrets\n- **alerts-to-dismiss: Contains a list of alerts that need manual dismissal\n\n### Next Steps:\n1. Download the backup artifact from the workflow run if needed\n2. Manually dismiss the REDACTED_REDACTED_SECRET (see alerts-to-dismiss artifact)\n3. Notify collaborators to update their local repositories (git fetch --all and git reset --hard origin/main)\n4. Verify that secrets have been properly \n5. **Important:* Revoke and rotate any exposed credentials immediately\n\nThank you for using the REDACTED_REDACTED_SECRET tool!"
           
           # Post comment to the issue
           curl -s -X POST \
