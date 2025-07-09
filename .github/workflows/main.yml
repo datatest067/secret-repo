@@ -17,578 +17,122 @@ jobs:
       TEMP_DIR: /tmp/secret-removal
 
     steps:
-      # Step 1: Parse form inputs from the issue body - SIMPLIFIED
-      - name: Parse form inputs from issue body
+      - name: Parse issue inputs
         id: parse
         run: |
-          echo "🔍 Raw ISSUE_BODY:"
-          echo "${{ github.event.issue.body }}"
-          echo "------------------------------"
-          
-          # Use grep to extract values - much simpler and more reliable
-          GH_REPO="secret-repo"
-          GH_ORG="datatest067"
-
-          
-          # Print for debug
-          echo "GH_REPO=$GH_REPO"
-          echo "GH_ORG=$GH_ORG"
-          
-          # Validate input
-          if [ -z "$GH_REPO" ] || [ -z "$GH_ORG" ]; then
-            echo "❌ One or more required values are missing"
-            exit 1
-          fi
-          
-          # Set outputs for use in other steps
-          echo "gh_repo=$GH_REPO" >> $GITHUB_OUTPUT
-          echo "gh_org=$GH_ORG" >> $GITHUB_OUTPUT
-          
-          # Create working directory
-          mkdir -p $TEMP_DIR
-      # Step 2: Temporarily disable branch protection
-      - name: Temporarily disable branch protection
-        env:
-          GH_REPO: ${{ steps.parse.outputs.gh_repo }}
-          GH_ORG: ${{ steps.parse.outputs.gh_org }}
-        run: |
-          echo "🔓 Temporarily disabling branch protection..."
-          
-          # Authenticate with GitHub CLI
-          echo "$PAT_TOKEN" | gh auth login --with-token
-          
-          # Get the default branch
-          DEFAULT_BRANCH=$(gh api \
-            -H "Accept: application/vnd.github+json" \
-            "/repos/$GH_ORG/$GH_REPO" | jq -r '.default_branch')
-          
-          echo "Default branch: $DEFAULT_BRANCH"
-          
-          # Get branch protection settings
-          echo "Fetching current branch protection settings..."
-          gh api \
-            -H "Accept: application/vnd.github+json" \
-            "/repos/$GH_ORG/$GH_REPO/branches/$DEFAULT_BRANCH/protection" > $TEMP_DIR/branch_protection.json || echo "No branch protection found"
-          
-          # Save branch protection settings for later restoration
-          if [ -s $TEMP_DIR/branch_protection.json ]; then
-            echo "Branch protection settings found and saved for later restoration"
-          else
-            echo "No branch protection settings found or unable to fetch"
-            echo "{}" > $TEMP_DIR/branch_protection.json
-          fi
-          
-          # Disable branch protection
-          echo "Disabling branch protection..."
-          curl -s -X DELETE \
-            -H "Authorization: token $PAT_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/$GH_ORG/$GH_REPO/branches/$DEFAULT_BRANCH/protection" || echo "Failed to disable branch protection"
-          
-          echo "✅ Branch protection temporarily disabled"
-      # Step 3: Clone the private repository using the provided PAT
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ steps.parse.outputs.gh_org }}/${{ steps.parse.outputs.gh_repo }}
-          token: ${{ secrets.PAT_TOKEN }}
-          fetch-depth: 0
-          fetch-tags: true
-
-      # Step 4: Create full repository backup
-      - name: Create repository backup
-        env:
-          GH_REPO: ${{ steps.parse.outputs.gh_repo }}
-          GH_ORG: ${{ steps.parse.outputs.gh_org }}
-        run: |
-          echo "📦 Creating repository backup..."
-          
-          # Create a backup directory in the temp directory
-          BACKUP_DIR="$TEMP_DIR/backup-$GH_REPO"
-          mkdir -p "$BACKUP_DIR"
-          
-          # Configure Git
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          
-          # Clone the repository with all branches and tags as a mirror
-          git clone --mirror "https://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@github.com/$GH_ORG/$GH_REPO.git" "$BACKUP_DIR/repo"
-          
-          # Remove .git/config file which might contain tokens
-          rm -f "$BACKUP_DIR/repo/config"
-          touch "$BACKUP_DIR/repo/config"
-          
-          # Create a zip archive of the backup
-          cd $TEMP_DIR
-          zip -r "$GH_REPO-backup.zip" "backup-$GH_REPO"
-          
-          # Create artifacts directory
+          echo "gh_repo=secret-repo" >> $GITHUB_OUTPUT
+          echo "gh_org=datatest067" >> $GITHUB_OUTPUT
           mkdir -p $TEMP_DIR/artifacts
-          mv "$GH_REPO-backup.zip" $TEMP_DIR/artifacts/
-          
-          echo "✅ Repository backup created: $TEMP_DIR/artifacts/$GH_REPO-backup.zip"
-      # Step 5: Upload repository backup as artifact
-      - name: Upload backup artifact
+
+      - name: Disable branch protection
+        run: |
+          echo "$PAT_TOKEN" | gh auth login --with-token
+          DEFAULT_BRANCH=$(gh api /repos/${{ steps.parse.outputs.gh_org }}/${{ steps.parse.outputs.gh_repo }} | jq -r .default_branch)
+          gh api /repos/${{ steps.parse.outputs.gh_org }}/${{ steps.parse.outputs.gh_repo }}/branches/$DEFAULT_BRANCH/protection > $TEMP_DIR/branch_protection.json || echo '{}' > $TEMP_DIR/branch_protection.json
+          curl -s -X DELETE -H "Authorization: token $PAT_TOKEN" -H "Accept: application/vnd.github+json" https://api.github.com/repos/${{ steps.parse.outputs.gh_org }}/${{ steps.parse.outputs.gh_repo }}/branches/$DEFAULT_BRANCH/protection
+
+      - name: Backup repository
+        env:
+          GH_REPO: ${{ steps.parse.outputs.gh_repo }}
+          GH_ORG: ${{ steps.parse.outputs.gh_org }}
+        run: |
+          BACKUP_DIR="$TEMP_DIR/backup"
+          git clone --mirror "https://${PAT_TOKEN}@github.com/${GH_ORG}/${GH_REPO}.git" "$BACKUP_DIR"
+          rm -f "$BACKUP_DIR/config" && touch "$BACKUP_DIR/config"
+          zip -r "$TEMP_DIR/artifacts/${GH_REPO}-backup.zip" "$BACKUP_DIR"
+
+      - name: Upload backup
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.parse.outputs.gh_repo }}-backup
+          name: repo-backup
           path: ${{ env.TEMP_DIR }}/artifacts/${{ steps.parse.outputs.gh_repo }}-backup.zip
-          retention-days: 30
 
-      # Step 6: Install GitHub CLI and BFG
-      - name: Install tools
+      - name: Clone repository
         run: |
-          # Install GitHub CLI
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-          sudo apt update
-          sudo apt install gh jq -y
-          
-          # Install Java for BFG
-          sudo apt-get install -y openjdk-11-jre-headless
-          
-          # Install BFG
+          git clone --mirror "https://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@github.com/${{ steps.parse.outputs.gh_org }}/${{ steps.parse.outputs.gh_repo }}.git" repo
+          cd repo
+
+      - name: Install CLI & BFG
+        run: |
+          sudo apt update && sudo apt install gh jq openjdk-11-jre-headless -y
           wget -O $TEMP_DIR/bfg.jar https://repo1.maven.org/maven2/com/madgag/bfg/1.14.0/bfg-1.14.0.jar
-          echo -e '#!/bin/bash\njava -jar '$TEMP_DIR'/bfg.jar "$@"' > $TEMP_DIR/bfg
-          chmod +x $TEMP_DIR/bfg
-          sudo mv $TEMP_DIR/bfg /usr/local/bin/bfg
-      # Step 7: Get ALL secret scanning alerts
-      - name: Get ALL secret scanning alerts
-        id: secrets_report
-        env:
-          GH_REPO: ${{ steps.parse.outputs.gh_repo }}
-          GH_ORG: ${{ steps.parse.outputs.gh_org }}
+          echo -e '#!/bin/bash\njava -jar '$TEMP_DIR'/bfg.jar "$@"' > /usr/local/bin/bfg && chmod +x /usr/local/bin/bfg
+
+      - name: Fetch secret alerts
+        id: fetch_alerts
         run: |
-          # Authenticate with GitHub CLI
           echo "$PAT_TOKEN" | gh auth login --with-token
-          
-          # Create directory for reports
           mkdir -p $TEMP_DIR/reports
-          mkdir -p $TEMP_DIR/artifacts
-          
-          # Get all alerts without filtering
-          echo "Fetching all secret scanning alerts..."
-          gh api \
-            -H "Accept: application/vnd.github+json" \
-            "/repos/$GH_ORG/$GH_REPO/secret-scanning/alerts?state=open&per_page=100" > $TEMP_DIR/reports/all_alerts.json || echo "[]" > $TEMP_DIR/reports/all_alerts.json
-          
-          # Specifically get generic alerts
-          echo "Fetching generic alerts..."
-          gh api \
-            -H "Accept: application/vnd.github+json" \
-            "/repos/$GH_ORG/$GH_REPO/secret-scanning/alerts?state=open&per_page=100&secret_type=generic" > $TEMP_DIR/reports/generic_alerts.json || echo "[]" > $TEMP_DIR/reports/generic_alerts.json
-          
-                    # Specifically get ***REMOVED*** alerts
-          echo "Fetching ***REMOVED*** alerts..."
-          gh api \
-            -H "Accept: application/vnd.github+json" \
-            "/repos/$GH_ORG/$GH_REPO/secret-scanning/alerts?state=open&per_page=100&secret_type=***REMOVED***" > $TEMP_DIR/reports/***REMOVED***_alerts.json || echo "[]" > $TEMP_DIR/reports/***REMOVED***_alerts.json
-          # Combine all alerts into one file
-          jq -s '.[0] + .[1] + .[2]' $TEMP_DIR/reports/all_alerts.json $TEMP_DIR/reports/generic_alerts.json $TEMP_DIR/reports/***REMOVED***_alerts.json | jq 'unique_by(.number)' > $TEMP_DIR/reports/alerts.json
-          # Extract alert numbers for later
-          jq -r '.[].number' $TEMP_DIR/reports/alerts.json > $TEMP_DIR/reports/alert_numbers.txt || echo "" > $TEMP_DIR/reports/alert_numbers.txt
-          
-          # Create a list of secret types for targeted patterns
-          jq -r '.[] | .secret_type' $TEMP_DIR/reports/alerts.json | sort | uniq > $TEMP_DIR/reports/secret_types.txt || echo "" > $TEMP_DIR/reports/secret_types.txt
-          
-          # Extract file paths and line numbers
-          jq -r '.[] | select(.location != null) | .location.path + ":" + (.location.start_line | tostring)' $TEMP_DIR/reports/alerts.json > $TEMP_DIR/reports/file_locations.txt || echo "" > $TEMP_DIR/reports/file_locations.txt
-          
-          # Create a file with exact secrets (for BFG)
-          jq -r '.[] | .secret' $TEMP_DIR/reports/alerts.json > $TEMP_DIR/reports/exact_secrets.txt || echo "" > $TEMP_DIR/reports/exact_secrets.txt
-          
-          # Create a detailed report of detected secrets
-          {
-            echo "# Secret Scanning Report"
-            echo "## Repository: $GH_ORG/$GH_REPO"
-            echo "## Date: $(date '+%Y-%m-%d %H:%M:%S')"
-            echo ""
-            echo "## Secret Types Detected"
-            echo ""
-            
-            # List all secret types with counts
-            if [ -s $TEMP_DIR/reports/alerts.json ] && [ "$(cat $TEMP_DIR/reports/alerts.json)" != "[]" ]; then
-              jq -r '.[] | .secret_type' $TEMP_DIR/reports/alerts.json | sort | uniq -c | while read count type; do
-                echo "- *$type*: $count instance(s)"
-              done
-            else
-              echo "No secrets detected."
-            fi
-            
-            echo ""
-            echo "## Secret Locations"
-            echo ""
-            
-            # List locations without showing actual secrets
-            if [ -s $TEMP_DIR/reports/alerts.json ] && [ "$(cat $TEMP_DIR/reports/alerts.json)" != "[]" ]; then
-              jq -r '.[] | "- *" + .secret_type + "* found in [" + .html_url + "](" + .html_url + ")"' $TEMP_DIR/reports/alerts.json
-            else
-              echo "No secret locations detected."
-            fi
-            
-            echo ""
-            echo "## Secret Details (Masked)"
-            echo ""
-            echo "| Type | First 4 chars | Last 4 chars | File Path |"
-            echo "| ---- | ------------- | ------------ | --------- |"
-            
-            # Show masked secrets with file paths
-            if [ -s $TEMP_DIR/reports/alerts.json ] && [ "$(cat $TEMP_DIR/reports/alerts.json)" != "[]" ]; then
-              jq -r '.[] | [.secret_type, (.secret | if length > 8 then (.[:4] + "..." + .[-4:]) else "too_short" end), (.location.path // "N/A")] | @tsv' $TEMP_DIR/reports/alerts.json | 
-              while IFS=$'\t' read -r type masked path; do
-                echo "| $type | ${masked:0:4} | ${masked: -4} | $path |"
-              done
-            else
-              echo "| N/A | N/A | N/A | N/A |"
-            fi
-          } > $TEMP_DIR/artifacts/secrets_detected_report.md
-          
-          # Create a summary for the output
-          echo "report_path=$TEMP_DIR/artifacts/secrets_detected_report.md" >> $GITHUB_OUTPUT
-          
-          # Count secrets, handling empty files
-          if [ -s $TEMP_DIR/reports/exact_secrets.txt ]; then
-            SECRET_COUNT=$(wc -l < $TEMP_DIR/reports/exact_secrets.txt)
-          else
-            SECRET_COUNT=0
-          fi
-          
-          echo "secret_count=$SECRET_COUNT" >> $GITHUB_OUTPUT
-          
-          echo "✅ Created report with $SECRET_COUNT detected secrets"
-      # Step 8: Upload the secrets report as an artifact
+          gh api /repos/${{ steps.parse.outputs.gh_org }}/${{ steps.parse.outputs.gh_repo }}/secret-scanning/alerts?state=open > $TEMP_DIR/reports/alerts.json
+          jq -r '.[].number' $TEMP_DIR/reports/alerts.json > $TEMP_DIR/reports/alert_numbers.txt
+          jq -r '.[].secret' $TEMP_DIR/reports/alerts.json > $TEMP_DIR/reports/secrets.txt
+          jq -r '.[] | "- " + .secret_type + " in " + (.location.path // "N/A")' $TEMP_DIR/reports/alerts.json > $TEMP_DIR/artifacts/secrets_report.md
+
       - name: Upload secrets report
         uses: actions/upload-artifact@v4
         with:
-          name: secrets-detected-report
-          path: ${{ env.TEMP_DIR }}/artifacts/secrets_detected_report.md
-          retention-days: 30
+          name: secrets-report
+          path: ${{ env.TEMP_DIR }}/artifacts/secrets_report.md
 
-            # Step 9: Direct file modification for specific files
-      - name: Direct file modification for specific files
+      - name: Redact files
         run: |
-          echo "🔧 Directly modifying files with secrets..."
-          
-          # Check if we have file locations
-          if [ -s $TEMP_DIR/reports/file_locations.txt ]; then
-            echo "Found $(wc -l < $TEMP_DIR/reports/file_locations.txt) file locations"
-            
-            # Process each file location
-            cat $TEMP_DIR/reports/file_locations.txt | while IFS=: read -r file line; do
-              if [ -f "$file" ]; then
-                echo "Processing $file:$line"
-                
-                # Replace the line with a placeholder based on file extension
-                case "${file##*.}" in
-                  json)
-                    # For JSON files
-                    sed -i "${line}s|***REMOVED***[^\"]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
-                    sed -i "${line}s|***REMOVED***[^\"]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
-                    sed -i "${line}s|***REMOVED***[^\"]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
-                    sed -i "${line}s|***REMOVED***[^\"]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
-                    ;;
-                  yml|yaml)
-                    # For YAML files
-                    sed -i "${line}s|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
-                    sed -i "${line}s|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
-                    sed -i "${line}s|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
-                    sed -i "${line}s|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
-                    ;;
-                  *)
-                    # For other file types
-                    sed -i "${line}s|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
-                    sed -i "${line}s|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
-                    sed -i "${line}s|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
-                    sed -i "${line}s|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g" "$file"
-                    ;;
-                esac
-                
-                echo "✅ Modified $file"
-              else
-                echo "⚠️ File not found: $file"
-              fi
-            done
-          else
-            echo "No file locations found"
+          if [ -s $TEMP_DIR/reports/alerts.json ]; then
+            jq -r '.[] | select(.location != null) | .location.path + ":" + (.location.start_line | tostring)' $TEMP_DIR/reports/alerts.json > $TEMP_DIR/locations.txt
+            while IFS=: read file line; do
+              [ -f "$file" ] && sed -i "${line}s|.*|***REMOVED***|" "$file"
+            done < $TEMP_DIR/locations.txt
+            git add . && git commit -m "Redacted secrets" || echo "No changes to commit"
           fi
-          
-          # Special handling for workflow files
-          echo "Checking workflow files for secrets..."
-          find .github/workflows -type f -name "*.yml" | while read -r file; do
-            echo "Processing workflow file: $file"
-            
-            # Replace connection string patterns in workflow files
-            sed -i 's|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g' "$file"
-            sed -i 's|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g' "$file"
-            sed -i 's|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g' "$file"
-            sed -i 's|***REMOVED***[^ ]*|***REMOVED***user:***REMOVED***@redacted|g' "$file"
-            
-            echo "✅ Processed workflow file: $file"
-          done
-          
-          # Also check poc.json specifically
-          if [ -f "poc.json" ]; then
-            echo "Processing poc.json..."
-            sed -i 's|"***REMOVED***[^"]*"|"***REMOVED***user:***REMOVED***@redacted"|g' poc.json
-            sed -i 's|"***REMOVED***[^"]*"|"***REMOVED***user:***REMOVED***@redacted"|g' poc.json
-            sed -i 's|"***REMOVED***[^"]*"|"***REMOVED***user:***REMOVED***@redacted"|g' poc.json
-            sed -i 's|"***REMOVED***[^"]*"|"***REMOVED***user:***REMOVED***@redacted"|g' poc.json
-            sed -i 's|"***REMOVED***"[[:space:]]:[[:space:]]"[^"]*"|"***REMOVED***": "REDACTED"|g' poc.json
-            echo "✅ Processed poc.json"
-          fi
-          
-          # Commit the changes
-          git add .
-          git commit -m "Remove secrets from files" || echo "No changes to commit"
-      # Step 10: Purge secrets using BFG with enhanced ***REMOVED*** patterns
-      - name: Purge secrets using BFG
-        run: |
-          echo "🧹 Purging secrets using BFG Repo-Cleaner..."
-          
-          # Create a temporary patterns file
-          PATTERNS_FILE="$TEMP_DIR/secrets-patterns.txt"
-          
-          # Create a comprehensive patterns file
-          {
-            echo "***REMOVED***"
-            if [ -s $TEMP_DIR/reports/exact_secrets.txt ]; then
-              cat $TEMP_DIR/reports/exact_secrets.txt | while read -r secret; do
-                # Escape special characters for regex
-                escaped_secret=$(echo "$secret" | sed 's/[.*+?^${}()|[\]\\]/\\&/g')
-                echo "$escaped_secret"
-              done
-            fi
-            
-            echo -e "\n***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-            
-            echo -e "\n***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-            
-            echo -e "\n***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-            
-            echo -e "\n***REMOVED***"
-            echo "[a-zA-Z0-9_\\-]{64,}"
-            echo "***REMOVED***"
-          } > $PATTERNS_FILE
-          
-          # Run BFG to remove secrets
-          bfg --replace-text $PATTERNS_FILE --no-blob-protection .
-          
-          # Clean up repository
-          git reflog expire --expire=now --all && git gc --prune=now --aggressive
-          
-          # Second ***REMOVED*** with more aggressive patterns
-          echo "Second ***REMOVED*** Using more aggressive patterns..."
-          {
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***wd"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-            echo "***REMOVED***"
-          } > $TEMP_DIR/aggressive-patterns.txt
-          
-          bfg --replace-text $TEMP_DIR/aggressive-patterns.txt --no-blob-protection .
-          git reflog expire --expire=now --all && git gc --prune=now --aggressive
-          
-          echo "✅ Secrets purged using BFG Repo-Cleaner"
-      # Step 11: Force push cleaned repository
-      - name: Force push cleaned repository
-        run: |
-          echo "🔄 Force pushing cleaned repository..."
-          
-          # Configure Git
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          
-          # Get the default branch
-          DEFAULT_BRANCH=$(git symbolic-ref --short HEAD)
-          echo "Default branch: $DEFAULT_BRANCH"
-          
-          # Force push all branches and tags
-          git push origin --all --force
-          git push origin --tags --force
-          
-          echo "✅ Repository pushed successfully"
-      # Step 12: Handle secret scanning alerts (with delegated dismissal support)
-      - name: Handle secret scanning alerts
-        env:
-          GH_REPO: ${{ steps.parse.outputs.gh_repo }}
-          GH_ORG: ${{ steps.parse.outputs.gh_org }}
-        run: |
-          echo "🔒 Handling secret scanning alerts..."
-          
-          # Create artifacts directory if it doesn't exist
-          mkdir -p $TEMP_DIR/artifacts
-          
-          # Check if we have alert numbers
-          if [ -s "$TEMP_DIR/reports/alert_numbers.txt" ]; then
-            # Create a report of alerts that need manual dismissal
-            {
-              echo "# Secret Scanning Alerts Requiring Manual Dismissal"
-              echo "## Repository: $GH_ORG/$GH_REPO"
-              echo "## Date: $(date '+%Y-%m-%d %H:%M:%S')"
-              echo ""
-              echo "The following alerts need to be manually dismissed due to delegated alert dismissal being enabled:"
-              echo ""
-              
-              jq -r '.[] | "- [Alert #" + (.number | tostring) + "](" + .html_url + ") - " + .secret_type' $TEMP_DIR/reports/alerts.json
-              
-              echo ""
-              echo "## How to Dismiss Alerts"
-              echo ""
-              echo "1. Click on each alert link above"
-              echo "2. Click the 'Close alert' button"
-              echo "3. Select 'Revoked' as the reason"
-              echo "4. Click 'Close alert'"
-            } > $TEMP_DIR/artifacts/alerts_to_dismiss.md
-            
-            # Try to close each alert, but don't fail if it doesn't work
-            cat $TEMP_DIR/reports/alert_numbers.txt | while read alert_number; do
-              echo "Attempting to close alert #$alert_number..."
-              gh api \
-                --method PATCH \
-                -H "Accept: application/vnd.github+json" \
-                "/repos/$GH_ORG/$GH_REPO/secret-scanning/alerts/$alert_number" \
-                -f state="resolved" \
-                -f resolution="revoked" || echo "⚠️ Could not close alert #$alert_number directly - manual dismissal required"
-            done
-          else
-            echo "No alert numbers found"
-            echo "# No Secret Scanning Alerts Found" > $TEMP_DIR/artifacts/alerts_to_dismiss.md
-          fi
-          
-          echo "✅ Secret scanning alerts handled"
-      # Step 13: Upload alerts to dismiss report
-      - name: Upload alerts to dismiss report
-        uses: actions/upload-artifact@v4
-        with:
-          name: alerts-to-dismiss
-          path: ${{ env.TEMP_DIR }}/artifacts/alerts_to_dismiss.md
-          retention-days: 30
 
-      # Step 14: Restore branch protection
+      - name: Run BFG
+        run: |
+          PATTERN_FILE="$TEMP_DIR/bfg_patterns.txt"
+          echo "***REMOVED***" > $PATTERN_FILE
+          cat $TEMP_DIR/reports/secrets.txt >> $PATTERN_FILE
+          bfg --replace-text $PATTERN_FILE --no-blob-protection .
+          git reflog expire --expire=now --all && git gc --prune=now --aggressive
+
+      - name: Push cleaned repo
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git push origin --force --all
+          git push origin --force --tags
+
+      - name: Dismiss alerts
+        run: |
+          if [ -s $TEMP_DIR/reports/alert_numbers.txt ]; then
+            while read alert; do
+              gh api -X PATCH -f state=resolved -f resolution=revoked \
+                /repos/${{ steps.parse.outputs.gh_org }}/${{ steps.parse.outputs.gh_repo }}/secret-scanning/alerts/$alert || echo "Alert $alert requires manual dismissal"
+            done < $TEMP_DIR/reports/alert_numbers.txt
+          fi
+
       - name: Restore branch protection
-        env:
-          GH_REPO: ${{ steps.parse.outputs.gh_repo }}
-          GH_ORG: ${{ steps.parse.outputs.gh_org }}
         run: |
-          echo "🔒 Restoring branch protection..."
-          
-          # Get the default branch
-          DEFAULT_BRANCH=$(gh api \
+          DEFAULT_BRANCH=$(gh api /repos/${{ steps.parse.outputs.gh_org }}/${{ steps.parse.outputs.gh_repo }} | jq -r .default_branch)
+          [ -s $TEMP_DIR/branch_protection.json ] && curl -s -X PUT \
+            -H "Authorization: token $PAT_TOKEN" \
             -H "Accept: application/vnd.github+json" \
-            "/repos/$GH_ORG/$GH_REPO" | jq -r '.default_branch')
-          
-          echo "Default branch: $DEFAULT_BRANCH"
-          
-          # Check if we have saved branch protection settings
-          if [ -s $TEMP_DIR/branch_protection.json ] && [ "$(cat $TEMP_DIR/branch_protection.json)" != "{}" ]; then
-            echo "Restoring branch protection settings..."
-            
-            # Extract required status checks
-            REQUIRED_STATUS_CHECKS=$(jq -c '.required_status_checks // null' $TEMP_DIR/branch_protection.json)
-            
-            # Extract required pull request reviews
-            REQUIRED_PR_REVIEWS=$(jq -c '.required_pull_request_reviews // null' $TEMP_DIR/branch_protection.json)
-            
-            # Extract restrictions
-            RESTRICTIONS=$(jq -c '.restrictions // null' $TEMP_DIR/branch_protection.json)
-            
-            # Extract enforce admins
-            ENFORCE_ADMINS=$(jq -r '.enforce_admins.enabled // false' $TEMP_DIR/branch_protection.json)
-            
-            # Create protection payload
-            PROTECTION_PAYLOAD="{}"
-            
-            if [ "$REQUIRED_STATUS_CHECKS" != "null" ]; then
-              PROTECTION_PAYLOAD=$(echo "$PROTECTION_PAYLOAD" | jq '. + {"required_status_checks": '"$REQUIRED_STATUS_CHECKS"'}')
-            fi
-            
-            if [ "$REQUIRED_PR_REVIEWS" != "null" ]; then
-              PROTECTION_PAYLOAD=$(echo "$PROTECTION_PAYLOAD" | jq '. + {"required_pull_request_reviews": '"$REQUIRED_PR_REVIEWS"'}')
-            fi
-            
-            if [ "$RESTRICTIONS" != "null" ]; then
-              PROTECTION_PAYLOAD=$(echo "$PROTECTION_PAYLOAD" | jq '. + {"restrictions": '"$RESTRICTIONS"'}')
-            fi
-            
-            PROTECTION_PAYLOAD=$(echo "$PROTECTION_PAYLOAD" | jq '. + {"enforce_admins": '"$ENFORCE_ADMINS"'}')
-            
-            # Apply branch protection
-            echo "Applying branch protection settings..."
-            echo "$PROTECTION_PAYLOAD" | curl -s -X PUT \
-              -H "Authorization: token $PAT_TOKEN" \
-              -H "Accept: application/vnd.github+json" \
-              -d @- \
-              "https://api.github.com/repos/$GH_ORG/$GH_REPO/branches/$DEFAULT_BRANCH/protection" || echo "Failed to restore branch protection"
-            
-            echo "✅ Branch protection restored"
-          else
-            echo "No branch protection settings to restore"
-          fi
-      # Step 15: Comment on the issue with completion status
-      - name: Comment on issue with completion status
+            -d @$TEMP_DIR/branch_protection.json \
+            https://api.github.com/repos/${{ steps.parse.outputs.gh_org }}/${{ steps.parse.outputs.gh_repo }}/branches/$DEFAULT_BRANCH/protection
+
+      - name: Comment and close issue
         env:
-          GH_REPO: ${{ steps.parse.outputs.gh_repo }}
-          GH_ORG: ${{ steps.parse.outputs.gh_org }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
-          echo "📝 Commenting on issue with completion status..."
-          
-          # Create the comment body
-          COMMENT="## 🎉 Secret Removal Process Completed\n\nThe secret removal process has been completed for repository *${GH_ORG}/${GH_REPO}.\n\n### Summary:\n- ✅ Repository backup created and saved as workflow artifacts (retained for 30 days)\n- ✅ Secrets detected and purged from repository history\n- ✅ Repository history has been cleaned and force pushed\n- ⚠️ Secret scanning alerts need manual dismissal (see alerts-to-dismiss artifact)\n- ✅ Branch protection rules have been restored\n\n### Artifacts:\n- **secrets-detected-report: Contains a masked summary of detected secrets\n- **alerts-to-dismiss: Contains a list of alerts that need manual dismissal\n\n### Next Steps:\n1. Download the backup artifact from the workflow run if needed\n2. Manually dismiss the secret scanning alerts (see alerts-to-dismiss artifact)\n3. Notify collaborators to update their local repositories (git fetch --all and git reset --hard origin/main)\n4. Verify that secrets have been properly \n5. **Important:* Revoke and rotate any exposed credentials immediately\n\nThank you for using the Secret Removal Automation tool!"
-          
-          # Post comment to the issue
+          COMMENT="Secrets removed, repo cleaned. Please review artifacts."
           curl -s -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/issues/$ISSUE_NUMBER/comments" \
-            -d "{\"body\": $(echo "$COMMENT" | jq -s -R .)}"
-          
-          # Close the issue
+            https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
+            -d "{\"body\": \"$COMMENT\"}"
           curl -s -X PATCH \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/issues/$ISSUE_NUMBER" \
+            https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }} \
             -d '{"state": "closed"}'
-          
-          echo "✅ Issue updated and closed"
-      # Step 16: Clean up temporary files
-      - name: Clean up temporary files
+
+      - name: Cleanup
         if: always()
-        run: |
-          echo "🧹 Cleaning up temporary files..."
-          
-          # Remove the temporary directory
-          rm -rf $TEMP_DIR
-          
-          # Remove any files that might have been created in the workspace
-          rm -f $GITHUB_WORKSPACE/*-backup.zip
-          rm -f $GITHUB_WORKSPACE/bfg.jar
-          rm -f $GITHUB_WORKSPACE/alerts.json
-          rm -f $GITHUB_WORKSPACE/secrets-patterns.txt
-          rm -f $GITHUB_WORKSPACE/branch_protection.json
-          rm -f $GITHUB_WORKSPACE/secrets_detected_report.md
-          rm -f $GITHUB_WORKSPACE/aggressive-patterns.txt
-          
-          # Remove any backup directories
-          rm -rf $GITHUB_WORKSPACE/backup-*
-          rm -rf $GITHUB_WORKSPACE/reports
-          
-          echo "✅ Temporary files cleaned up"
-          echo "All temporary files and directories have been removed."
+        run: rm -rf $TEMP_DIR $GITHUB_WORKSPACE/*.zip
