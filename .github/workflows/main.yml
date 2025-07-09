@@ -166,8 +166,6 @@ jobs:
           GH_ORG: ${{ steps.parse.outputs.gh_org }}
         run: |
           # Authenticate with GitHub CLI
-          # Authenticate with GitHub CLI
-          # Authenticate with GitHub CLI
           echo "$PAT_TOKEN" | gh auth login --with-token
           
           # Create directories for reports and artifacts
@@ -186,7 +184,7 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             "/repos/$GH_ORG/$GH_REPO/secret-scanning/alerts?state=open&per_page=100&secret_type=generic" > "$TEMP_DIR/reports/generic_alerts.json" || echo "[]" > "$TEMP_DIR/reports/generic_alerts.json"
           
-          # Fetch specific type alerts if needed (replace ***REMOVED*** with actual type or remove this section)
+          # Fetch specific type alerts (example: github_pat)
           echo "Fetching specific type alerts..."
           gh api \
             -H "Accept: application/vnd.github+json" \
@@ -208,62 +206,9 @@ jobs:
           # Extract file paths and line numbers
           jq -r '.[] | select(.location != null) | .location.path + ":" + (.location.start_line | tostring)' "$TEMP_DIR/reports/alerts.json" > "$TEMP_DIR/reports/file_locations.txt" || echo "" > "$TEMP_DIR/reports/file_locations.txt"
           
-          # Extract exact REDACTED_SECRET
-          jq -r '.[] | select(.secret != null) | .REDACTED_SECRET" > "$TEMP_DIR/reports/exact_secrets.txt" || echo "" > "$TEMP_DIR/reports/exact_secrets.txt"
-          
-          # Create markdown report
-          {
-            echo "# REDACTED_SECRET Report"
-            echo "## Repository: $GH_ORG/$GH_REPO"
-            echo "## Date: $(date '+%Y-%m-%d %H:%M:%S')"
-            echo ""
-          
-            echo "## Secret Types Detected"
-            echo ""
-            if [ -s "$TEMP_DIR/reports/alerts.json" ] && [ "$(cat "$TEMP_DIR/reports/alerts.json")" != "[]" ]; then
-              jq -r '.[] | .secret_type' "$TEMP_DIR/reports/alerts.json" | sort | uniq -c | while read -r count type; do
-                echo "- *$type*: $count instance(s)"
-              done
-            else
-              echo "No secrets detected."
-            fi
-          
-            echo ""
-            echo "## Alert Summary"
-            echo ""
-            if [ -s "$TEMP_DIR/reports/alerts.json" ]; then
-              jq -r '.[] | "- *" + .secret_type + "* found in [" + .html_url + "](" + .html_url + ")"' "$TEMP_DIR/reports/alerts.json"
-            else
-              echo "No open alerts found."
-            fi
-          
-            echo ""
-            echo "## Secrets Table"
-            echo "| Type | Masked Secret | File Path |"
-            echo "| ---- | ------------- | --------- |"
-          
-            if [ -s "$TEMP_DIR/reports/alerts.json" ]; then
-              jq -r '.[] | [.secret_type, (.secret | if length > 8 then (.[:4] + "..." + .[-4:]) else "too_short" end), (.location.path // "N/A")] | @tsv' "$TEMP_DIR/reports/alerts.json" | \
-              while IFS=$'\t' read -r type masked path; do
-                echo "| $type | $masked | $path |"
-              done
-            else
-              echo "| N/A | N/A | N/A |"
-            fi
-          } > "$TEMP_DIR/artifacts/secrets_detected_report.md"
-          
-          # Output metadata
-          echo "report_path=$TEMP_DIR/artifacts/secrets_detected_report.md" >> "$GITHUB_OUTPUT"
-          
-          # Count secrets
-          if [ -s "$TEMP_DIR/reports/exact_secrets.txt" ]; then
-            SECRET_COUNT=$(wc -l < "$TEMP_DIR/reports/exact_secrets.txt")
-          else
-            SECRET_COUNT=0
-          fi
-          
-          echo "secret_count=$SECRET_COUNT" >> "$GITHUB_OUTPUT"
-          echo "✅ Created report with $SECRET_COUNT detected secrets"
+          # Extract exact secrets safely (replace '.secret' if your JSON uses another key)
+          jq -r '.[] | select(.secret != null) | .secret' "$TEMP_DIR/reports/alerts.json" > "$TEMP_DIR/reports/exact_secrets.txt" || echo "" > "$TEMP_DIR/reports/exact_secrets.txt"
+
 
 
       # Step 8: Upload the secrets report as an artifact
