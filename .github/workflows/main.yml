@@ -20,8 +20,8 @@ jobs:
       - name: Parse issue inputs
         id: parse
         run: |
-          GH_REPO=$(echo "${{ github.event.issue.body }}" | grep -i '^repo:' | cut -d':' -f2 | xargs)
-          GH_ORG=$(echo "${{ github.event.issue.body }}" | grep -i '^org:' | cut -d':' -f2 | xargs)
+          GH_REPO="secret-repo"
+          GH_ORG="datatest067"
           echo "gh_repo=$GH_REPO" >> $GITHUB_OUTPUT
           echo "gh_org=$GH_ORG" >> $GITHUB_OUTPUT
           mkdir -p $TEMP_DIR/artifacts
