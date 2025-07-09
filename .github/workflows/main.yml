@@ -47,11 +47,6 @@ jobs:
           name: repo-backup
           path: ${{ env.TEMP_DIR }}/artifacts/${{ steps.parse.outputs.gh_repo }}-backup.zip
 
-      - name: Clone repository
-        run: |
-          git clone --mirror "https://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@github.com/${{ steps.parse.outputs.gh_org }}/${{ steps.parse.outputs.gh_repo }}.git" repo
-          cd repo
-
       - name: Install CLI & BFG
         run: |
           sudo apt update && sudo apt install gh jq openjdk-11-jre-headless -y
@@ -86,11 +81,19 @@ jobs:
 
       - name: Run BFG
         run: |
+          REPO_MIRROR="$TEMP_DIR/backup-${GH_REPO}/repo"
           PATTERN_FILE="$TEMP_DIR/bfg_patterns.txt"
-          echo "***REMOVED***" > $PATTERN_FILE
-          cat $TEMP_DIR/reports/secrets.txt >> $PATTERN_FILE
-          bfg --replace-text $PATTERN_FILE --no-blob-protection .
-          git reflog expire --expire=now --all && git gc --prune=now --aggressive
+          
+          echo "***REMOVED***" > "$PATTERN_FILE"
+          cat "$TEMP_DIR/reports/secrets.txt" >> "$PATTERN_FILE"
+          
+          # BFG needs to run inside the mirror repo directory
+          cd "$REPO_MIRROR"
+          
+          bfg --replace-text "$PATTERN_FILE" --no-blob-protection .
+          
+          git reflog expire --expire=now --all
+          git gc --prune=now --aggressive
 
       - name: Push cleaned repo
         run: |
