@@ -99,8 +99,13 @@ jobs:
       - name: Push cleaned repo
         run: |
           cd "${{ steps.backup.outputs.repo_mirror }}"
+      
+          git remote remove origin || true
+          git remote add origin "https://$PAT_TOKEN@github.com/${{ steps.parse.outputs.gh_org }}/${{ steps.parse.outputs.gh_repo }}.git"
+      
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
+      
           git push origin --force --all
           git push origin --force --tags
 
