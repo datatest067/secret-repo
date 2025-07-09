@@ -165,44 +165,51 @@ jobs:
           GH_ORG: ${{ steps.parse.outputs.gh_org }}
         run: |
           # Authenticate with GitHub CLI
+          # Authenticate with GitHub CLI
           echo "$PAT_TOKEN" | gh auth login --with-token
           
-          # Create directory for reports
-          mkdir -p $TEMP_DIR/reports
-          mkdir -p $TEMP_DIR/artifacts
+          # Create directories for reports and artifacts
+          mkdir -p "$TEMP_DIR/reports"
+          mkdir -p "$TEMP_DIR/artifacts"
           
-          # Get all alerts without filtering
+          # Fetch all open secret scanning alerts
           echo "Fetching all REDACTED_SECRET alerts..."
           gh api \
             -H "Accept: application/vnd.github+json" \
-            "/repos/$GH_ORG/$GH_REPO/secret-scanning/alerts?state=open&per_page=100" > $TEMP_DIR/reports/all_alerts.json || echo "[]" > $TEMP_DIR/reports/all_alerts.json
+            "/repos/$GH_ORG/$GH_REPO/secret-scanning/alerts?state=open&per_page=100" > "$TEMP_DIR/reports/all_alerts.json" || echo "[]" > "$TEMP_DIR/reports/all_alerts.json"
           
-          # Specifically get generic alerts
+          # Fetch generic secret alerts
           echo "Fetching generic alerts..."
           gh api \
             -H "Accept: application/vnd.github+json" \
-            "/repos/$GH_ORG/$GH_REPO/secret-scanning/alerts?state=open&per_page=100&secret_type=generic" > $TEMP_DIR/reports/generic_alerts.json || echo "[]" > $TEMP_DIR/reports/generic_alerts.json
+            "/repos/$GH_ORG/$GH_REPO/secret-scanning/alerts?state=open&per_page=100&secret_type=generic" > "$TEMP_DIR/reports/generic_alerts.json" || echo "[]" > "$TEMP_DIR/reports/generic_alerts.json"
           
-                    # Specifically get ***REMOVED*** alerts
+          # Fetch ***REMOVED*** secret alerts
           echo "Fetching ***REMOVED*** alerts..."
           gh api \
             -H "Accept: application/vnd.github+json" \
-            "/repos/$GH_ORG/$GH_REPO/secret-scanning/alerts?state=open&per_page=100&secret_type=***REMOVED***" > $TEMP_DIR/reports/***REMOVED***_alerts.json || echo "[]" > $TEMP_DIR/reports/***REMOVED***_alerts.json
-          # Combine all alerts into one file
-          jq -s '.[0] + .[1] + .[2]' $TEMP_DIR/reports/all_alerts.json $TEMP_DIR/reports/generic_alerts.json $TEMP_DIR/reports/***REMOVED***_alerts.json | jq 'unique_by(.number)' > $TEMP_DIR/reports/alerts.json
-          # Extract alert numbers for later
-          jq -r '.[].number' $TEMP_DIR/reports/alerts.json > $TEMP_DIR/reports/alert_numbers.txt || echo "" > $TEMP_DIR/reports/alert_numbers.txt
+            "/repos/$GH_ORG/$GH_REPO/secret-scanning/alerts?state=open&per_page=100&secret_type=***REMOVED***" > "$TEMP_DIR/reports/***REMOVED***_alerts.json" || echo "[]" > "$TEMP_DIR/reports/***REMOVED***_alerts.json"
           
-          # Create a list of secret types for targeted patterns
-          jq -r '.[] | .secret_type' $TEMP_DIR/reports/alerts.json | sort | uniq > $TEMP_DIR/reports/secret_types.txt || echo "" > $TEMP_DIR/reports/secret_types.txt
+          # Combine all alerts into one unique list by alert number
+          jq -s '.[0] + .[1] + .[2]' \
+            "$TEMP_DIR/reports/all_alerts.json" \
+            "$TEMP_DIR/reports/generic_alerts.json" \
+            "$TEMP_DIR/reports/***REMOVED***_alerts.json" | \
+            jq 'unique_by(.number)' > "$TEMP_DIR/reports/alerts.json"
+          
+          # Extract alert numbers to a file
+          jq -r '.[].number' "$TEMP_DIR/reports/alerts.json" > "$TEMP_DIR/reports/alert_numbers.txt" || echo "" > "$TEMP_DIR/reports/alert_numbers.txt"
+          
+          # Extract unique secret types
+          jq -r '.[] | .secret_type' "$TEMP_DIR/reports/alerts.json" | sort | uniq > "$TEMP_DIR/reports/secret_types.txt" || echo "" > "$TEMP_DIR/reports/secret_types.txt"
           
           # Extract file paths and line numbers
-          jq -r '.[] | select(.location != null) | .location.path + ":" + (.location.start_line | tostring)' $TEMP_DIR/reports/alerts.json > $TEMP_DIR/reports/file_locations.txt || echo "" > $TEMP_DIR/reports/file_locations.txt
+          jq -r '.[] | select(.location != null) | .location.path + ":" + (.location.start_line | tostring)' "$TEMP_DIR/reports/alerts.json" > "$TEMP_DIR/reports/file_locations.txt" || echo "" > "$TEMP_DIR/reports/file_locations.txt"
           
-          # Create a file with exact secrets (for BFG)
-          jq -r '.[] | .REDACTED_SECRET > $TEMP_DIR/reports/exact_secrets.txt || echo "" > $TEMP_DIR/reports/exact_secrets.txt
+          # Create a file with exact secrets for further processing (like BFG)
+          jq -r '.[] | .secret' "$TEMP_DIR/reports/alerts.json" > "$TEMP_DIR/reports/exact_secrets.txt" || echo "" > "$TEMP_DIR/reports/exact_secrets.txt"
           
-          # Create a detailed report of detected secrets
+          # Create a detailed markdown report
           {
             echo "# REDACTED_SECRET Report"
             echo "## Repository: $GH_ORG/$GH_REPO"
@@ -210,57 +217,55 @@ jobs:
             echo ""
             echo "## Secret Types Detected"
             echo ""
-            
-            # List all secret types with counts
-            if [ -s $TEMP_DIR/reports/alerts.json ] && [ "$(cat $TEMP_DIR/reports/alerts.json)" != "[]" ]; then
-              jq -r '.[] | .secret_type' $TEMP_DIR/reports/alerts.json | sort | uniq -c | while read count type; do
+          
+            if [ -s "$TEMP_DIR/reports/alerts.json" ] && [ "$(cat "$TEMP_DIR/reports/alerts.json")" != "[]" ]; then
+              jq -r '.[] | .secret_type' "$TEMP_DIR/reports/alerts.json" | sort | uniq -c | while read -r count type; do
                 echo "- *$type*: $count instance(s)"
               done
             else
               echo "No secrets detected."
             fi
-            
+          
             echo ""
             echo "## REDACTED_SECRET"
             echo ""
-            
-            # List locations without showing actual secrets
-            if [ -s $TEMP_DIR/reports/alerts.json ] && [ "$(cat $TEMP_DIR/reports/alerts.json)" != "[]" ]; then
-              jq -r '.[] | "- *" + .secret_type + "* found in [" + .html_url + "](" + .html_url + ")"' $TEMP_DIR/reports/alerts.json
+          
+            if [ -s "$TEMP_DIR/reports/alerts.json" ] && [ "$(cat "$TEMP_DIR/reports/alerts.json")" != "[]" ]; then
+              jq -r '.[] | "- *" + .secret_type + "* found in [" + .html_url + "](" + .html_url + ")"' "$TEMP_DIR/reports/alerts.json"
             else
               echo "No REDACTED_SECRET detected."
             fi
-            
+          
             echo ""
             echo "## REDACTED_SECRET (Masked)"
             echo ""
-            echo "| Type | First 4 chars | Last 4 chars | File Path |"
-            echo "| ---- | ------------- | ------------ | --------- |"
-            
-            # Show masked secrets with file paths
-            if [ -s $TEMP_DIR/reports/alerts.json ] && [ "$(cat $TEMP_DIR/reports/alerts.json)" != "[]" ]; then
-              jq -r '.[] | [.secret_type, (.secret | if length > 8 then (.[:4] + "..." + .[-4:]) else "too_short" end), (.location.path // "N/A")] | @tsv' $TEMP_DIR/reports/alerts.json | 
+            echo "| Type | Masked Secret | File Path |"
+            echo "| ---- | ------------- | --------- |"
+          
+            if [ -s "$TEMP_DIR/reports/alerts.json" ] && [ "$(cat "$TEMP_DIR/reports/alerts.json")" != "[]" ]; then
+              jq -r '.[] | [.secret_type, (.secret | if length > 8 then (.[:4] + "..." + .[-4:]) else "too_short" end), (.location.path // "N/A")] | @tsv' "$TEMP_DIR/reports/alerts.json" | \
               while IFS=$'\t' read -r type masked path; do
-                echo "| $type | ${masked:0:4} | ${masked: -4} | $path |"
+                echo "| $type | $masked | $path |"
               done
             else
-              echo "| N/A | N/A | N/A | N/A |"
+              echo "| N/A | N/A | N/A |"
             fi
-          } > $TEMP_DIR/artifacts/secrets_detected_report.md
+          } > "$TEMP_DIR/artifacts/secrets_detected_report.md"
           
-          # Create a summary for the output
-          echo "report_path=$TEMP_DIR/artifacts/secrets_detected_report.md" >> $GITHUB_OUTPUT
+          # Output report path for GitHub Actions
+          echo "report_path=$TEMP_DIR/artifacts/secrets_detected_report.md" >> "$GITHUB_OUTPUT"
           
-          # Count secrets, handling empty files
-          if [ -s $TEMP_DIR/reports/exact_secrets.txt ]; then
-            SECRET_COUNT=$(wc -l < $TEMP_DIR/reports/exact_secrets.txt)
+          # Count secrets for summary output
+          if [ -s "$TEMP_DIR/reports/exact_secrets.txt" ]; then
+            SECRET_COUNT=$(wc -l < "$TEMP_DIR/reports/exact_secrets.txt")
           else
             SECRET_COUNT=0
           fi
           
-          echo "secret_count=$SECRET_COUNT" >> $GITHUB_OUTPUT
+          echo "secret_count=$SECRET_COUNT" >> "$GITHUB_OUTPUT"
           
           echo "✅ Created report with $SECRET_COUNT detected secrets"
+
       # Step 8: Upload the secrets report as an artifact
       - name: Upload secrets report
         uses: actions/upload-artifact@v4
