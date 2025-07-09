@@ -37,7 +37,7 @@ jobs:
           GH_ORG: ${{ steps.parse.outputs.gh_org }}
         run: |
           BACKUP_DIR="$TEMP_DIR/backup"
-          git clone --mirror "https://${PAT_TOKEN}@github.com/${GH_ORG}/${GH_REPO}.git" "$BACKUP_DIR"
+          git clone --mirror "https://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@github.com/${GH_ORG}/${GH_REPO}.git" "$BACKUP_DIR"
           rm -f "$BACKUP_DIR/config" && touch "$BACKUP_DIR/config"
           zip -r "$TEMP_DIR/artifacts/${GH_REPO}-backup.zip" "$BACKUP_DIR"
 
