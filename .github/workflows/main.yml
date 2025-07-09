@@ -294,7 +294,8 @@ jobs:
           echo "🔧 Checking .github/workflows/*.yml"
           find .github/workflows -type f -name "*.yml" | while read -r file; do
             echo "Sanitizing workflow: $file"
-            sed -Ei 's/([Pp]assword|[Ss]ecret|[Tt]oken|[Kk]ey)[[:space:]]*[:=][[:space:]]*["'"'"']?[^"'"\s]+["'"'"']?/REDACTED_SECRET/g' "$file"
+            #sed -Ei 's/([Pp]assword|[Ss]ecret|[Tt]oken|[Kk]ey)[[:space:]]*[:=][[:space:]]*["'"'"']?[^"'"\s]+["'"'"']?/REDACTED_SECRET/g' "$file"
+            sed -i "${line}s/\(password\|api[_-]\?key\|token\|secret\)[\"':= ]\{1,\}[\"']\?[^\"' ]\{6,\}/REDACTED_SECRET/gI" "$file"
           done
           
           # Optionally scan known sensitive files like poc.json
