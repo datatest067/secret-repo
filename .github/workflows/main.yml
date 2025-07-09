@@ -19,7 +19,7 @@ jobs:
     steps:
       - name: Set remote URL
         run: |
-          git remote add origin https://datatest067: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@github.com/datatest067/secret-repo.git"
+          git remote add origin "https://datatest067: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@github.com/datatest067/secret-repo.git"
         env:
           GITHUB_TOKEN: ${{ secrets.MY_SECRET }}
       # Step 1: Parse form inputs from the issue body - SIMPLIFIED
